@@ -3,11 +3,13 @@
   V2 two-tier airlift tower — parametric design study.
 
   Nothing here is printable yet. The geometry is built in JavaScript from the
-  parameters in v2-two-tier-spec.md, so the numbers can be changed and judged
-  before any CAD exists. Self-contained: no local files, no web server needed.
+  parameters in v2-two-tier-spec.md, so the numbers can be judged before any CAD
+  exists. Self-contained: no local files, no web server needed.
 
-  The single number that decides whether this design is possible at all is the
-  measured airlift rise. Everything else is downstream of it.
+  The airlift follows the standard undergravel uplift-tube arrangement: the pump
+  sits OUTSIDE the glass and only an air hose comes in, plugging into a barb on
+  the side of the tube foot. The foot is a funnel intake. The tube must stay at
+  least 70 % submerged, which is what really caps how high water can be lifted.
 -->
 <html lang="en">
 <head>
@@ -21,7 +23,7 @@
     font-family:'Avenir Next','Segoe UI',system-ui,sans-serif}
   header{padding:16px 18px 10px}
   h1{margin:0;font-size:16px;font-weight:600}
-  header p{margin:6px 0 0;font-size:12px;color:var(--sub);line-height:1.55;max-width:760px}
+  header p{margin:6px 0 0;font-size:12px;color:var(--sub);line-height:1.55;max-width:790px}
   #stage{position:relative;width:100%;height:56vh;min-height:340px;touch-action:none;cursor:grab}
   #stage.grabbing{cursor:grabbing}
   canvas{display:block}
@@ -29,13 +31,14 @@
     padding:24px;text-align:center;font-size:13.5px;color:var(--sub)}
   #err.on{display:flex}
   .panel{padding:12px 18px 26px;display:grid;gap:18px;
-    grid-template-columns:repeat(auto-fit,minmax(300px,1fr));max-width:1180px}
+    grid-template-columns:repeat(auto-fit,minmax(310px,1fr));max-width:1200px}
   .card h2{margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:.04em;
     text-transform:uppercase;color:var(--sub)}
+  .card h2+h2{margin-top:16px}
   .row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
-  label{font-size:12px;color:var(--sub);min-width:118px}
-  input[type=range]{flex:1;min-width:110px;accent-color:var(--accent)}
-  .val{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;min-width:56px;
+  label{font-size:12px;color:var(--sub);min-width:120px}
+  input[type=range]{flex:1;min-width:100px;accent-color:var(--accent)}
+  .val{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;min-width:60px;
     text-align:right}
   button{font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--line);
     background:#fff;color:var(--ink);border-radius:20px;cursor:pointer;transition:.15s}
@@ -52,7 +55,7 @@
   ul.checks li:last-child{border-bottom:0}
   .mark{flex:0 0 15px;font-weight:700}
   .m-ok{color:var(--teal)} .m-warn{color:#B07A3C} .m-bad{color:#B04A4A}
-  .note{font-size:11.5px;color:var(--sub);line-height:1.65;max-width:760px;
+  .note{font-size:11.5px;color:var(--sub);line-height:1.65;max-width:790px;
     padding:0 18px 26px}
   .note b{color:var(--accent)}
   code{background:#F0E8E2;padding:1px 5px;border-radius:4px;font-size:11px}
@@ -62,10 +65,11 @@
 
 <header>
   <h1>Two-Tier Airlift Tower — design study</h1>
-  <p>Six hydroponic succulents on two levels, water lifted from one shared reservoir by
-     an aquarium air stone. <b>No printable files exist yet.</b> Move the top slider to the
-     value you measure in the glass and the model tells you whether this design can work
-     at all. Drag to rotate, scroll to zoom, hold Shift to pan.</p>
+  <p>Six hydroponic succulents on two levels, water lifted from one shared reservoir by an
+     uplift tube. The air pump stays outside the glass; only a hose comes in, plugged into
+     a barb on the tube foot. <b>No printable files exist yet.</b> Set the top slider to what
+     you measure and the model says whether the idea survives. Drag to rotate, scroll to
+     zoom, hold Shift to pan.</p>
 </header>
 
 <div id="stage"><div id="err"></div></div>
@@ -75,16 +79,27 @@
   <div class="card">
     <h2>The number that decides everything</h2>
     <div class="row">
-      <label>Measured airlift rise</label>
+      <label>Measured lift</label>
       <input type="range" id="s-lift" min="0" max="90" step="1" value="0">
       <span class="val" id="v-lift">not measured</span>
     </div>
     <div class="verdict" id="verdict"></div>
-    <h2>Geometry</h2>
+
+    <h2>Tiers</h2>
     <div class="row">
-      <label>Tier 1 diameter</label>
+      <label>Lower tier span</label>
       <button id="b-84" aria-pressed="false">&#216;84</button>
       <button id="b-110" aria-pressed="true">&#216;110</button>
+    </div>
+    <div class="row">
+      <label>Upper tier span</label>
+      <input type="range" id="s-t2" min="70" max="130" step="1" value="104">
+      <span class="val" id="v-t2"></span>
+    </div>
+    <div class="row">
+      <label>Waist pinch</label>
+      <input type="range" id="s-waist" min="55" max="150" step="1" value="72">
+      <span class="val" id="v-waist"></span>
     </div>
     <div class="row">
       <label>Tier gap</label>
@@ -97,24 +112,22 @@
       <span class="val" id="v-cup"></span>
     </div>
     <div class="row">
-      <label>Outer rim</label>
-      <input type="range" id="s-rim" min="0" max="30" step="1" value="0">
-      <span class="val" id="v-rim"></span>
-    </div>
-    <div class="row">
       <label>Reservoir level</label>
       <input type="range" id="s-water" min="50" max="76" step="1" value="74">
       <span class="val" id="v-water"></span>
     </div>
+
+    <h2>View</h2>
     <div class="row">
-      <label>Splash guard</label>
-      <button id="b-guard" aria-pressed="true">clipped on</button>
+      <label>Show</label>
       <button id="b-glass" aria-pressed="true">glass + water</button>
+      <button id="b-dish" aria-pressed="true">catch dish</button>
     </div>
     <div class="row">
-      <label>View</label>
+      <label>Camera</label>
       <button id="b-whole" aria-pressed="true">whole tower</button>
-      <button id="b-zoom" aria-pressed="false">splash guard close-up</button>
+      <button id="b-foot" aria-pressed="false">hose inlet</button>
+      <button id="b-top" aria-pressed="false">discharge</button>
     </div>
   </div>
 
@@ -126,66 +139,68 @@
 </div>
 
 <div class="note">
-  <b>Where the numbers come from.</b> Every default is from
-  <code>v2-two-tier-spec.md</code>: column &#216;28, tier 1 at z=84, trough 16 mm deep with
-  3 mm walls, 10 mm of water in the trough, tier 2 at 0.65&times; the tier 1 diameter,
-  4 plants below and 2 above. The mesh base is the V1 part, reused unchanged.
+  <b>How the airlift is arranged.</b> Straight from the reference sketch: the pump lives
+  outside the glass, a single air hose comes over the rim and plugs into a barb on the side
+  of the tube foot, and the foot itself is a funnel that draws water in off the bottom.
+  Air injected at the foot rises inside the tube and drags water with it. Nothing electrical
+  goes in the water and there is no air stone loose in the reservoir.
   <br><br>
-  <b>Why the airlift rise is a hard ceiling.</b> An air-stone lift raises water by roughly
-  10&ndash;20&nbsp;% of how deep the tube is submerged &mdash; not by how powerful the pump is.
-  The glass only holds ~74 mm of water, so a 1 W pump and a 5 W pump reach the same
-  height; the bigger one just bubbles harder. Measure it before anything is designed:
-  a clear &#216;6&ndash;8 mm tube with the air stone at its foot, standing in the filled glass,
-  and read how far above the water the flow comes out.
+  <b>The 70 % rule is the real ceiling.</b> An uplift tube only works while most of its length
+  is under water &mdash; the sketch marks it <em>&ldquo;&#7889;ng ph&#7843;i ng&#7853;p &gt;70%&rdquo;</em>.
+  The reservoir is only ~74 mm deep, so the whole tube can be about 100 mm long at most,
+  which puts a hard ceiling on the discharge height no pump wattage can move. That is why
+  a 5 W pump and a 1 W pump reach the same height; the bigger one only bubbles harder.
   <br><br>
-  <b>The splash guard is a separate clip-on part.</b> An airlift delivers water and air
-  together, so the outlet spits: bubbles burst as they leave and throw droplets. Dropping
-  that mixture onto an open water surface is the worst case. The guard is a U-channel that
-  sockets onto the spout with a 0.2 mm hand-tight fit and carries the flow down to
-  <em>below</em> the trough surface, so there is no free-falling jet and no open-air burst.
-  The channel is open on top along its whole length, which lets the air peel off gradually
-  instead of blowing out in one place &mdash; and makes the part print with no supports,
-  channel opening upwards. Pull it off to clean it; nothing is glued.
+  <b>Why the tiers are lobed instead of round.</b> A round disc has to be wide enough to hold
+  the planting holes, and then everything between the holes and the rim is dead material that
+  also shades whatever is underneath. Following the outline of the holes instead gives a
+  peanut on top and a clover below, turned 90&deg; to each other, so the upper plants sit over
+  the lower plate&rsquo;s gaps and light reaches down. It also deletes the leftover wall
+  slivers between each hole and the rim.
   <br><br>
-  Note that this stops the <em>splashing</em>, not the flow. To actually stop the water
-  moving, close the <em>air</em> line &mdash; a few-cent aquarium check/gang valve on the
-  hose does it. Blocking the water outlet on a running airlift just forces the air back
-  down the tube.
+  <b>Water gets down by overflowing, not by draining.</b> Each basin has notches cut into its
+  <em>inner</em> wall with their sills exactly at the working water depth. Water above that
+  level spills over, runs down the outside of the tube and lands in the basin below &mdash;
+  and out of the lower basin the same way, into the glass. Running the water down a surface
+  rather than dropping it through air is what keeps it from splashing. Holes in the floor
+  would drain the basin dry instead of holding a depth.
   <br><br>
   <b>The glass profile is interpolated, not measured.</b> Inner mouth &#216;90 and 80 mm from
-  the base to the low side of the slanted rim are real measurements; the bulge of the
-  body and the curve of the base are guesses from a photograph.
+  the base to the low side of the slanted rim are real measurements; the bulge of the body and
+  the curve of the base are guesses from a photograph.
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-// ═════════════════════════════════════════════════ tham số cố định (v2-two-tier-spec.md)
+// ═════════════════════════════════════════════════ tham số cố định
 const P = {
-  COL_OUTER_R: 14, COL_INNER_R: 11, TUBE_ID: 7,
-  BASE_TOP_Z: 67,                 // đỉnh đế lưới V1, tái dùng nguyên
-  T1_Z: 84,                       // cao độ mặt dưới đĩa tầng 1
-  TROUGH_DEPTH: 16, TROUGH_WALL: 3, WATER_IN_TROUGH: 10,
-  CUP_WALL: 2.5, CUP_DEPTH: 18,
-  T2_RATIO: 0.65,                 // T2_DIA = 0.65 x T1_DIA
-  SPOUT_ABOVE_WATER: 12,          // miệng vòi cao hơn mực nước máng tầng 2
-  SPOUT_OD: 11,                   // đường kính ngoài ống vòi (thành 2mm)
-  ELBOW_ABOVE_RIM: 3,             // đáy khuỷu cao hơn miệng bờ máng bấy nhiêu
+  // ── ống nâng (airlift) theo sơ đồ tham chiếu ──────────────────────────────
+  TUBE_ID: 7, TUBE_OD: 11,
+  FOOT_Z: 4,                      // đáy phễu hút cách đáy trong ly
+  FUNNEL_H: 14, FUNNEL_D: 30,     // phễu hút "nền sạn"
+  BARB_D: 5, BARB_LEN: 9,         // cút cắm dây khí Ø4-6, nằm bên hông chân ống
+  BARB_Z: 16,                     // cao độ cút, phải NGẬP nước
+  SUBMERGE_MIN: 0.70,             // ống phải ngập >70% — luật gốc của airlift
+  BEND_R: 12,                     // bán kính bẻ ngang ở đầu ra
 
-  // ── Máng chặn văng (chi tiết rời, clip vào cuối vòi) ─────────────────────
-  GUARD_SOCKET_DEPTH: 12,
-  GUARD_CLEARANCE: 0.20,          // P.clearance("snug") cua Neptune 4 — lap tay chat
-  GUARD_WALL: 1.6,
-  GUARD_CHANNEL_W: 7,             // long mang chu U — de tong be rong lot long mang nuoc
-  GUARD_RAIL_H: 6,                // thanh chan hai ben
-  GUARD_SUBMERGE: 3,              // dau mang ngap duoi mat nuoc mang bao nhieu
+  // ── đĩa hứng ở đầu ra (chi tiết rời, clip vào) ────────────────────────────
+  DISH_D: 34, DISH_H: 9, DISH_WALL: 1.6,
+  DISH_CLEARANCE: 0.20,           // P.clearance("snug") cua Neptune 4
+
+  // ── máng trồng ────────────────────────────────────────────────────────────
+  T1_Z: 84,
+  TROUGH_DEPTH: 16, TROUGH_WALL: 3, WATER_IN_TROUGH: 10,
+  CUP_WALL: 2.5, CUP_DEPTH: 18, CUP_GAP: 2,   // khe giua hoc va vach thuy
   T1_PLANTS: 4, T2_PLANTS: 2,
-  GLASS_MOUTH_R: 45, GLASS_RIM_LOW_Z: 80, GLASS_RIM_HIGH_Z: 115,
-  RETURN_HOLES: 4, RETURN_HOLE_D: 5,
-  MOUTH_CLEAR_D: 84,              // cột + đế phải chui lọt miệng ly O90
+  HUB_R: 14,                      // bán kính ngoài ống bao quanh tube
+  NOTCH_W: 8,                     // bề rộng khe tràn trên vách trong
+
+  GLASS_MOUTH_R: 45, GLASS_RIM_LOW_Z: 80,
+  MOUTH_CLEAR_D: 84,
 };
 
-const S = { lift: 0, t1dia: 110, rise: 40, cup: 30, rim: 0, water: 74,
-            glass: true, guard: true, zoom: false };
+const S = { lift: 0, t1: 110, t2: 104, waist: 72, rise: 40, cup: 30, water: 74,
+            glass: true, dish: true, view: "whole" };
 
 const stage = document.getElementById("stage");
 const errEl = document.getElementById("err");
@@ -200,394 +215,458 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xFAF6F2);
 const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 20000);
 camera.up.set(0, 0, 1);
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 stage.appendChild(renderer.domElement);
-
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f78, 0.95));
 const key = new THREE.DirectionalLight(0xffffff, 0.55);
 key.position.set(1, -1.4, 2);
 scene.add(key);
-
-const grid = new THREE.GridHelper(200, 20, 0xD8CCC4, 0xEBE2DB);
+const grid = new THREE.GridHelper(240, 24, 0xD8CCC4, 0xEBE2DB);
 grid.rotation.x = Math.PI / 2;
 scene.add(grid);
-
 const model = new THREE.Group();
 scene.add(model);
 
-// LatheGeometry quay quanh trục Y; cả dự án dùng trục Z hướng lên nên xoay lại.
-function lathe(pts, color, opts = {}) {
-  const geo = new THREE.LatheGeometry(
-    pts.map(([r, h]) => new THREE.Vector2(Math.max(r, 1e-4), h)), opts.seg || 96);
-  geo.rotateX(Math.PI / 2);
-  geo.computeVertexNormals();
-  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-    color, side: THREE.DoubleSide,
-    transparent: opts.opacity !== undefined,
-    opacity: opts.opacity ?? 1, depthWrite: opts.opacity === undefined,
-  }));
-}
+const MAT = {
+  tier:  0x8FAF9F, cup: 0xB4737A, tube: 0x7FA8BD, dish: 0xD98E3F,
+  glass: 0x9FB8C4, water: 0x6FA8C0, base: 0x5C7F72, hose: 0x4A4A4A, pump: 0x585858,
+};
+const mat = (c, o) => new THREE.MeshLambertMaterial({
+  color: c, side: THREE.DoubleSide,
+  transparent: o !== undefined, opacity: o ?? 1, depthWrite: o === undefined });
 
+function lathe(pts, color, opacity, seg = 96) {
+  const g = new THREE.LatheGeometry(
+    pts.map(([r, h]) => new THREE.Vector2(Math.max(r, 1e-4), h)), seg);
+  g.rotateX(Math.PI / 2);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat(color, opacity));
+}
 function tube(r, z0, z1, color, opacity) {
-  const g = new THREE.CylinderGeometry(r, r, z1 - z0, 48, 1, true);
+  const g = new THREE.CylinderGeometry(r, r, Math.max(z1 - z0, 0.01), 40, 1, true);
   g.rotateX(Math.PI / 2);
   g.translate(0, 0, (z0 + z1) / 2);
-  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({
-    color, side: THREE.DoubleSide,
-    transparent: opacity !== undefined, opacity: opacity ?? 1,
-    depthWrite: opacity === undefined,
-  }));
+  return new THREE.Mesh(g, mat(color, opacity));
+}
+function extrude(shape, depth, z, color, opacity) {
+  const g = new THREE.ExtrudeGeometry(shape,
+    { depth, bevelEnabled: false, curveSegments: 64, steps: 1 });
+  g.translate(0, 0, z);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat(color, opacity));
+}
+const V2 = p => new THREE.Vector2(p[0], p[1]);
+function shapeOf(outer, holes = []) {
+  const s = new THREE.Shape(outer.map(V2));
+  holes.forEach(h => s.holes.push(new THREE.Path(h.map(V2))));
+  return s;
+}
+function circlePts(r, cw = false, seg = 72) {
+  const out = [];
+  for (let i = 0; i < seg; i++) {
+    const a = (cw ? -1 : 1) * 2 * Math.PI * i / seg;
+    out.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+  return out;
 }
 
-// ═════════════════════════════════════════════════ dựng lại mô hình khi đổi tham số
+// Biên dạng nhiều thuỳ: hợp của n hình tròn đặt trên vòng bán kính lobeC, cộng
+// một đĩa eo bán kính waistR ở giữa. Tính giao tia — không cần thư viện boolean.
+function lobeOutline(n, lobeC, lobeR, waistR, phase, seg = 240) {
+  const pts = [];
+  for (let i = 0; i < seg; i++) {
+    const th = 2 * Math.PI * i / seg;
+    let r = waistR;
+    for (let k = 0; k < n; k++) {
+      const dphi = th - (phase + 2 * Math.PI * k / n);
+      const s = lobeC * Math.sin(dphi);
+      if (Math.abs(s) <= lobeR) {
+        r = Math.max(r, lobeC * Math.cos(dphi) + Math.sqrt(lobeR * lobeR - s * s));
+      }
+    }
+    pts.push([r * Math.cos(th), r * Math.sin(th)]);
+  }
+  return pts;
+}
+const reverse = pts => pts.slice().reverse();
+
+// Chữ nhật bo tròn, ngược chiều kim đồng hồ
+function roundedRect(len, wid, r, seg = 8) {
+  const hx = len / 2 - r, hy = wid / 2 - r, pts = [];
+  const corner = (cx, cy, a0) => {
+    for (let i = 0; i <= seg; i++) {
+      const a = a0 + Math.PI / 2 * i / seg;
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+  };
+  corner(hx, hy, 0); corner(-hx, hy, Math.PI / 2);
+  corner(-hx, -hy, Math.PI); corner(hx, -hy, 1.5 * Math.PI);
+  return pts;
+}
+
+// Quạt vành khuyên — dùng dựng vách trong có khe tràn, mỗi đoạn một chiều cao
+function annularSector(rIn, rOut, a0, a1) {
+  const s = new THREE.Shape();
+  s.absarc(0, 0, rOut, a0, a1, false);
+  s.absarc(0, 0, rIn, a1, a0, true);
+  return s;
+}
+
+// ═════════════════════════════════════════════════ suy ra kích thước
 function derive() {
   const W = P.TROUGH_WALL, D = P.TROUGH_DEPTH;
-  const t2dia = S.t1dia * P.T2_RATIO;
-  const t2z   = P.T1_Z + S.rise;
+  const cupOuterR = S.cup / 2 + P.CUP_WALL;
+  const lobeR = cupOuterR + W + P.CUP_GAP;
+  const hubIn = P.HUB_R, hubOut = P.HUB_R + W;
 
-  const tier = (dia) => {
-    const rOut = dia / 2 - S.rim;              // mép ngoài BỜ máng
-    const rIn  = P.COL_OUTER_R + 3;            // mép trong bờ máng, sát cột
+  // Eo không được bóp quá: lòng máng phải THÔNG suốt qua eo, nếu không hai thuỳ
+  // thành hai bể rời, mỗi bể phải có đường cấp riêng.
+  const WAIST_CHANNEL_MIN = 6;
+  const waistFloor = hubOut + W + WAIST_CHANNEL_MIN;
+
+  const tierOf = (span, n, phase) => {
+    const lobeC = Math.max(span / 2 - lobeR, 0);
+    const waistR = Math.min(Math.max(S.waist / 100 * lobeC, waistFloor), lobeC + lobeR);
     return {
-      dia, rOut, rIn,
-      floorR0: rIn + W, floorR1: rOut - W,     // lòng máng
-      ring: (rIn + W + rOut - W) / 2,          // vòng đặt hốc trồng
+      span, n, phase, lobeC, lobeR, waistR,
+      outer: lobeOutline(n, lobeC, lobeR, waistR, phase),
+      inner: lobeOutline(n, lobeC, lobeR - W, waistR - W, phase),
+      shortAxis: 2 * waistR,
+      pitch: n > 1 ? 2 * lobeC * Math.sin(Math.PI / n) : Infinity,
+      // hốc phải nằm gọn trong thuỳ: tâm hốc ở lobeC, mép hốc tới lobeC+cupOuterR
+      cupFits: cupOuterR <= lobeR - W,
+      basinWidth: 2 * (lobeR - W),
+      waistChannel: (waistR - W) - hubOut,   // bề rộng lòng máng ở chỗ eo
+      pinched: waistR < lobeC,               // eo có thật sự bóp lại không
     };
   };
-  const t1 = tier(S.t1dia), t2 = tier(t2dia);
 
-  const cupOuterR = S.cup / 2 + P.CUP_WALL;
-  // Mực nước máng tầng 2 -> miệng vòi -> đó mới là độ cao airlift phải nâng tới.
-  const troughWaterZ2 = t2z + W + P.WATER_IN_TROUGH;
-  const spoutZ = troughWaterZ2 + P.SPOUT_ABOVE_WATER;
+  const t1 = tierOf(S.t1, P.T1_PLANTS, Math.PI / 4);
+  const t2z = P.T1_Z + S.rise;
+  const t2 = tierOf(S.t2, P.T2_PLANTS, 0);          // lệch 90° so với thuỳ tầng dưới
 
-  const spoutR = t2.ring;
-  // Khuỷu phải kết thúc TRÊN miệng bờ máng: ổ cắm của máng chặn văng rộng hơn
-  // lòng máng nước, thò xuống là đâm vào vách.
-  const rimZ   = t2z + W + D;
-  const elbowZ = rimZ + P.ELBOW_ABOVE_RIM;
-  const socketOD = P.SPOUT_OD + 2 * P.GUARD_CLEARANCE + 2 * P.GUARD_WALL;
+  const water1 = P.T1_Z + W + P.WATER_IN_TROUGH;
+  const water2 = t2z + W + P.WATER_IN_TROUGH;
+  const dischargeZ = t2z + W + D + 6;               // đầu ra cao hơn miệng bờ máng
+
+  // Đầu ra đổ vào chỗ EO, giữa hai thuỳ — thuỳ nào cũng đã có hốc trồng chiếm chỗ,
+  // đặt đĩa hứng lên thuỳ là đè lên cây.
+  const dischargeAngle = Math.PI / 2 + t2.phase;
+  // Eo bị bóp thì chỉ còn một rãnh hẹp — đĩa hứng tròn không lọt. Làm máng thuôn
+  // chạy dọc theo eo: hẹp theo phương bán kính, dài theo phương tiếp tuyến.
+  const dishR = hubOut + Math.max(t2.waistChannel, 0) / 2;
+  const dishW = Math.max(t2.waistChannel - 2, 4);
+  const dishL = 30;
+  const dishZ = dischargeZ - P.DISH_H - 2;
+
+  const tubeLen = dischargeZ - P.FOOT_Z;
+  const submerged = Math.max(0, Math.min(S.water, dischargeZ) - P.FOOT_Z);
 
   return {
-    W, D, t1, t2, t2dia, t2z, cupOuterR, spoutZ, spoutR, elbowZ, rimZ, socketOD,
-    troughWater1: P.T1_Z + W + P.WATER_IN_TROUGH,
-    troughWater2: troughWaterZ2,
-    liftToSpout: spoutZ - S.water,
-    liftToTier2: t2z - S.water,
-    liftToTier1: P.T1_Z + W + P.WATER_IN_TROUGH - S.water,
-    cupPitch1: 2 * t1.ring * Math.sin(Math.PI / P.T1_PLANTS),
-    cupPitch2: 2 * t2.ring * Math.sin(Math.PI / P.T2_PLANTS),
-    freeRim: (S.t1dia / 2) - (t1.ring + cupOuterR),
-
-    // máng chặn văng: kết thúc sát vách ngoài, đầu máng ngập dưới mặt nước
-    guardEndR: t2.floorR1 - 2,
-    guardEndZ: troughWaterZ2 - P.GUARD_SUBMERGE,
-    guardToCup: 2 * t2.ring * Math.sin(Math.PI / (2 * P.T2_PLANTS)),
-    guardSlack: (t2.floorR1 - t2.floorR0) - (P.GUARD_CHANNEL_W + 2 * P.GUARD_WALL),
+    W, D, cupOuterR, lobeR, hubIn, hubOut, t1, t2, t2z,
+    water1, water2, dischargeZ, dishZ, dischargeAngle, dishR, dishW, dishL,
+    tubeLen, submerged, submergeRatio: submerged / tubeLen,
+    maxDischargeZ: P.FOOT_Z + (S.water - P.FOOT_Z) / P.SUBMERGE_MIN,
+    liftToDischarge: dischargeZ - S.water,
+    liftToTier1: water1 - S.water,
+    dishInnerD: P.DISH_D - 2 * P.DISH_WALL,
   };
 }
 
-function troughProfile(t, W, D) {
-  // Mặt cắt máng vành khuyên, gốc ở mặt dưới đĩa. Lỗ giữa cho ống airlift đi qua
-  // (đặc tả vẽ moay-ơ đặc từ tâm — chắc là sót, vì ống phải xuyên lên tầng 2).
-  const { rIn, rOut } = t;
-  return [
-    [P.COL_INNER_R, 0], [rOut, 0], [rOut, W + D], [rOut - W, W + D],
-    [rOut - W, W], [rIn + W, W], [rIn + W, W + D], [rIn, W + D],
-    [rIn, W], [P.COL_INNER_R, W], [P.COL_INNER_R, 0],
-  ];
-}
+// ═════════════════════════════════════════════════ dựng
+function buildTier(t, z, d) {
+  const g = new THREE.Group();
+  const { W, D, hubIn, hubOut } = d;
 
-function cupMesh(cupOuterR, z) {
-  const m = lathe([
-    [0, 0], [cupOuterR, 0], [cupOuterR, P.CUP_DEPTH],
-    [S.cup / 2, P.CUP_DEPTH], [S.cup / 2, 2], [0, 2], [0, 0],
-  ], 0xB4737A, { seg: 48 });
-  m.position.z = z;
-  return m;
+  // sàn máng, khoét lỗ giữa cho ống đi qua
+  g.add(extrude(shapeOf(t.outer, [circlePts(hubIn, true)]), W, z, MAT.tier));
+
+  // vách ngoài chạy theo đúng biên dạng thuỳ — không còn mẩu vách thừa nào
+  g.add(extrude(shapeOf(t.outer, [reverse(t.inner)]), D, z + W, MAT.tier));
+
+  // vách trong có KHE TRÀN: ngưỡng khe đúng bằng mực nước làm việc, nước dâng
+  // quá thì tràn qua, chảy men theo ống xuống tầng dưới
+  const halfArc = (P.NOTCH_W / hubIn) / 2;
+  for (let i = 0; i < t.n; i++) {
+    const c = t.phase + 2 * Math.PI * i / t.n;
+    const nxt = t.phase + 2 * Math.PI * (i + 1) / t.n;
+    g.add(extrude(annularSector(hubIn, hubOut, c - halfArc, c + halfArc),
+                  P.WATER_IN_TROUGH, z + W, MAT.tier));
+    g.add(extrude(annularSector(hubIn, hubOut, c + halfArc, nxt - halfArc),
+                  D, z + W, MAT.tier));
+  }
+
+  // nước trong máng
+  g.add(extrude(shapeOf(t.inner, [circlePts(hubOut, true)]),
+                P.WATER_IN_TROUGH, z + W, MAT.water, 0.32));
+
+  // hốc trồng, mỗi thuỳ một cái
+  for (let i = 0; i < t.n; i++) {
+    const a = t.phase + 2 * Math.PI * i / t.n;
+    const cup = lathe([[0, 0], [d.cupOuterR, 0], [d.cupOuterR, P.CUP_DEPTH],
+                       [S.cup / 2, P.CUP_DEPTH], [S.cup / 2, 2], [0, 2], [0, 0]],
+                      MAT.cup, undefined, 48);
+    cup.position.set(t.lobeC * Math.cos(a), t.lobeC * Math.sin(a), z + W);
+    g.add(cup);
+  }
+  return g;
 }
 
 function rebuild() {
   const d = derive();
   while (model.children.length) model.remove(model.children[0]);
 
-  // ── ly thuỷ tinh + nước (biên dạng thân là NỘI SUY, không phải số đo)
   if (S.glass) {
-    model.add(lathe([
-      [0, 0], [40, 0], [44, 14], [46.5, 40], [45.5, 62], [P.GLASS_MOUTH_R, P.GLASS_RIM_LOW_Z],
-      [P.GLASS_MOUTH_R + 3, P.GLASS_RIM_LOW_Z], [48.5, 62], [49.5, 40], [47, 14], [43, 0], [0, 0],
-    ], 0x9FB8C4, { opacity: 0.18 }));
+    model.add(lathe([[0, 0], [40, 0], [44, 14], [46.5, 40], [45.5, 62],
+                     [P.GLASS_MOUTH_R, P.GLASS_RIM_LOW_Z],
+                     [P.GLASS_MOUTH_R + 3, P.GLASS_RIM_LOW_Z], [48.5, 62], [49.5, 40],
+                     [47, 14], [43, 0], [0, 0]], MAT.glass, 0.16));
     model.add(lathe([[0, 0], [43.5, 0], [44.6, 30], [44.2, S.water], [0, S.water], [0, 0]],
-                    0x6FA8C0, { opacity: 0.24 }));
+                    MAT.water, 0.22));
   }
 
-  // ── đế lưới V1, tái dùng nguyên (biên dạng lấy từ generate_v1_single_tier.py)
+  // ── đế lưới V1, tái dùng nguyên
   model.add(lathe([[27, 0], [30, 0], [38, 62], [45.6, 67], [43, 67], [35, 62], [27, 0]],
-                  0x5C7F72, { seg: 96 }));
+                  MAT.base));
 
-  // ── cột dưới và cột trên
-  model.add(tube(P.COL_OUTER_R, P.BASE_TOP_Z, P.T1_Z, 0x5C7F72));
-  model.add(tube(P.COL_OUTER_R, P.T1_Z + d.W, d.t2z, 0x5C7F72));
+  // ── ỐNG NÂNG: phễu hút -> cút cắm dây khí -> ống đứng -> bẻ ngang
+  model.add(lathe([[P.FUNNEL_D / 2, 0], [P.TUBE_OD / 2, P.FUNNEL_H],
+                   [P.TUBE_ID / 2, P.FUNNEL_H], [P.FUNNEL_D / 2 - 2, 0.5],
+                   [P.FUNNEL_D / 2, 0]], MAT.tube, undefined, 48)
+        .translateZ(P.FOOT_Z));
+  model.add(tube(P.TUBE_OD / 2, P.FOOT_Z + P.FUNNEL_H, d.dischargeZ, MAT.tube));
 
-  // ── ống airlift trong lòng cột, chạy từ đá sủi lên miệng vòi
-  model.add(tube(P.TUBE_ID / 2, 6, d.spoutZ, 0x7FA8BD, 0.65));
-  const stone = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 16, 32),
-    new THREE.MeshLambertMaterial({ color: 0x8C8C8C }));
-  stone.geometry.rotateX(Math.PI / 2);
-  stone.position.z = 8;
-  model.add(stone);
+  // cút cắm dây khí, nằm bên hông chân ống và phải ngập nước
+  const barb = new THREE.Mesh(
+    new THREE.CylinderGeometry(P.BARB_D / 2, P.BARB_D / 2 + 0.8, P.BARB_LEN, 20),
+    mat(MAT.tube));
+  barb.geometry.rotateZ(Math.PI / 2);
+  barb.geometry.translate(P.TUBE_OD / 2 + P.BARB_LEN / 2, 0, 0);
+  barb.position.z = P.BARB_Z;
+  model.add(barb);
 
-  // ── hai đĩa máng + hốc trồng
-  for (const [t, z, n, phase, isT2] of [[d.t1, P.T1_Z, P.T1_PLANTS, 0, false],
-                                        [d.t2, d.t2z, P.T2_PLANTS, Math.PI / 4, true]]) {
-    // Cận cảnh: bỏ hẳn tầng 1 và các hốc trồng, để đĩa tầng 2 mờ. Chồng nhiều
-    // lớp trong suốt lên nhau thì không đọc được gì — thà giấu đi.
-    if (S.zoom && !isT2) continue;
+  // ống bẻ ngang + đĩa hứng, cùng quay về hướng đầu ra
+  const outlet = new THREE.Group();
+  outlet.rotation.z = d.dischargeAngle;
+  const bend = new THREE.Mesh(
+    new THREE.TorusGeometry(Math.max(d.dishR, 4), P.TUBE_OD / 2, 10, 24, Math.PI / 2),
+    mat(MAT.tube));
+  bend.geometry.rotateX(Math.PI / 2);
+  bend.position.set(Math.max(d.dishR, 4), 0, d.dischargeZ);
+  bend.rotation.z = Math.PI;
+  outlet.add(bend);
 
-    const disc = lathe(troughProfile(t, d.W, d.D), 0x8FAF9F,
-                       S.zoom ? { opacity: 0.22 } : {});
-    disc.position.z = z;
-    model.add(disc);
+  // ── DÂY KHÍ + MÁY SỦI, đều nằm NGOÀI ly
+  const hosePts = [
+    new THREE.Vector3(P.TUBE_OD / 2 + P.BARB_LEN, 0, P.BARB_Z),
+    new THREE.Vector3(34, -6, P.BARB_Z - 2),
+    new THREE.Vector3(46, -10, 40),
+    new THREE.Vector3(50, -12, 86),
+    new THREE.Vector3(66, -14, 74),
+    new THREE.Vector3(84, -14, 30),
+    new THREE.Vector3(92, -14, 12),
+  ];
+  model.add(new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hosePts), 60, 2.2, 10, false),
+    mat(MAT.hose)));
+  const pump = new THREE.Mesh(new THREE.BoxGeometry(30, 24, 22), mat(MAT.pump));
+  pump.position.set(106, -14, 11);
+  model.add(pump);
 
-    // nước trong máng
-    const wr = lathe([[t.floorR0, 0], [t.floorR1, 0],
-                      [t.floorR1, P.WATER_IN_TROUGH], [t.floorR0, P.WATER_IN_TROUGH],
-                      [t.floorR0, 0]], 0x6FA8C0, { opacity: S.zoom ? 0.28 : 0.35 });
-    wr.position.z = z + d.W;
-    model.add(wr);
+  // ── hai tầng
+  model.add(buildTier(d.t1, P.T1_Z, d));
+  model.add(buildTier(d.t2, d.t2z, d));
 
-    if (S.zoom) continue;
-    for (let i = 0; i < n; i++) {
-      const a = phase + i * 2 * Math.PI / n;
-      const cup = cupMesh(d.cupOuterR, z + d.W);
-      cup.position.x = t.ring * Math.cos(a);
-      cup.position.y = t.ring * Math.sin(a);
-      model.add(cup);
-    }
+  // ── ĐĨA HỨNG — chi tiết rời, clip vào cuối ống bẻ ngang, ngồi ở chỗ eo
+  if (S.dish) {
+    const g = new THREE.Group();
+    const outer = roundedRect(d.dishL, d.dishW, Math.min(d.dishW / 2 - 0.1, 5));
+    const inner = roundedRect(d.dishL - 2 * P.DISH_WALL, d.dishW - 2 * P.DISH_WALL,
+                              Math.min(d.dishW / 2 - P.DISH_WALL - 0.1, 4));
+    g.add(extrude(shapeOf(outer), P.DISH_WALL, 0, MAT.dish));           // đáy máng
+    g.add(extrude(shapeOf(outer, [reverse(inner)]), P.DISH_H, 0, MAT.dish)); // hai thành
+    const collar = P.TUBE_OD / 2 + P.DISH_CLEARANCE + P.DISH_WALL;
+    g.add(tube(collar, P.DISH_H, P.DISH_H + 11, MAT.dish));
+    g.rotation.z = Math.PI / 2;                       // dài theo phương tiếp tuyến
+    g.position.set(d.dishR, 0, d.dishZ);
+    outlet.add(g);
   }
-
-  // ── vòi ra tầng 2: tay ngang rồi khuỷu chúc xuống trên lòng máng
-  const arm = new THREE.Mesh(
-    new THREE.CylinderGeometry(P.SPOUT_OD / 2, P.SPOUT_OD / 2, d.spoutR, 24),
-    new THREE.MeshLambertMaterial({ color: 0x7FA8BD }));
-  arm.geometry.rotateZ(Math.PI / 2);                       // trục ống nằm theo X
-  arm.geometry.translate(d.spoutR / 2, 0, 0);
-  arm.position.z = d.spoutZ;
-  model.add(arm);
-
-  const elbow = tube(P.SPOUT_OD / 2, d.elbowZ, d.spoutZ, 0x7FA8BD);
-  elbow.position.x = d.spoutR;
-  model.add(elbow);
-
-  // ── MÁNG CHẶN VĂNG — chi tiết rời, clip vào cuối vòi, tháo ra được
-  // Nước không rơi tự do vào mặt nước nữa mà trượt theo lòng máng chữ U rồi ra
-  // ở dưới mặt nước. Bọt khí thoát dọc suốt chiều dài máng hở nóc, không nổ
-  // dồn một chỗ. Không có tia nước nào ở trên mặt nước -> không văng.
-  if (S.guard) {
-    // màu riêng, không trùng với hốc trồng — đây là chi tiết rời, phải nhận ra ngay
-    const mat = new THREE.MeshLambertMaterial({ color: 0xD98E3F });
-    const W_ = P.GUARD_WALL, CW = P.GUARD_CHANNEL_W;
-
-    // ổ cắm ôm lấy khuỷu vòi, nằm TRÊN miệng bờ máng
-    const sock = new THREE.Mesh(new THREE.CylinderGeometry(
-      d.socketOD / 2, d.socketOD / 2, P.GUARD_SOCKET_DEPTH, 32, 1, true), mat);
-    sock.geometry.rotateX(Math.PI / 2);
-    sock.position.set(d.spoutR, 0, d.elbowZ + P.GUARD_SOCKET_DEPTH / 2 - 1);
-    model.add(sock);
-
-    // Máng chữ U dựng trong hệ toạ độ riêng (X chạy dọc máng), rồi xoay cả cụm.
-    // Xoay từng miếng một là công thức tạo lỗi — đã thử, các thanh chắn văng lung tung.
-    const ax = d.spoutR, az = d.elbowZ;
-    const bx = d.guardEndR, bz = d.guardEndZ;
-    const L = Math.hypot(bx - ax, bz - az);
-    const alpha = Math.atan2(bz - az, bx - ax);   // góc dốc trong mặt phẳng XZ
-
-    const chute = new THREE.Group();
-    chute.position.set(ax, 0, az);
-    chute.rotation.y = -alpha;                    // xoay quanh Y: +X -> hướng A→B
-
-    const slab = (w, h, dpt, x, y, z) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dpt), mat);
-      m.position.set(x, y, z);
-      return m;
-    };
-    chute.add(slab(L, CW, W_, L / 2, 0, 0));                       // lòng máng
-    for (const s of [-1, 1])                                       // hai thành
-      chute.add(slab(L, W_, P.GUARD_RAIL_H, L / 2,
-                     s * (CW + W_) / 2, P.GUARD_RAIL_H / 2));
-    chute.add(slab(W_, CW, P.GUARD_RAIL_H + 4, L,                  // lưỡi tì vách
-                   0, (P.GUARD_RAIL_H + 4) / 2 - 2));
-    model.add(chute);
-  }
+  model.add(outlet);
 
   report(d);
 }
 
 // ═════════════════════════════════════════════════ phán quyết + bảng kiểm
 function report(d) {
-  const measured = S.lift;
-  const vEl = document.getElementById("verdict");
-
+  const m = S.lift, vEl = document.getElementById("verdict");
+  const ratioPct = (d.submergeRatio * 100).toFixed(0);
   let cls, text;
-  if (measured === 0) {
+
+  if (d.submergeRatio < P.SUBMERGE_MIN) {
+    cls = "bad";
+    text = `The tube would be only ${ratioPct} % submerged. An uplift tube needs `
+         + `${P.SUBMERGE_MIN * 100} %, so the discharge cannot sit higher than `
+         + `${d.maxDischargeZ.toFixed(0)} mm above the base - it is at `
+         + `${d.dischargeZ.toFixed(0)} mm. No pump wattage fixes this; lower the tiers `
+         + `or drop to one tier.`;
+  } else if (m === 0) {
     cls = "warn";
-    text = "Not measured yet. Until this number exists the design cannot be built - "
-         + "a wrong guess here wastes hours of CAD and a whole print run. "
-         + "The test takes five minutes.";
-  } else if (measured >= d.liftToSpout) {
+    text = `Submergence is fine at ${ratioPct} %, but the lift is still unmeasured. `
+         + `${d.liftToDischarge.toFixed(0)} mm is needed. Five minutes with a straw and `
+         + `the air pump settles it.`;
+  } else if (m >= d.liftToDischarge) {
     cls = "ok";
-    text = `${measured} mm measured, ${d.liftToSpout.toFixed(0)} mm needed to reach the `
-         + `tier 2 spout. Design is feasible as drawn.`;
-  } else if (measured >= d.liftToTier1) {
+    text = `${m} mm measured, ${d.liftToDischarge.toFixed(0)} mm needed, tube ${ratioPct} % `
+         + `submerged. Feasible as drawn.`;
+  } else if (m >= d.liftToTier1) {
     cls = "warn";
-    text = `${measured} mm measured, but ${d.liftToSpout.toFixed(0)} mm is needed to reach `
-         + `the tier 2 spout. Tier 1 alone needs ${d.liftToTier1.toFixed(0)} mm and would `
-         + `work. Either drop to a single tier, or lower tier 1 and close the gap.`;
+    text = `${m} mm measured but ${d.liftToDischarge.toFixed(0)} mm needed. The lower tier `
+         + `alone needs ${d.liftToTier1.toFixed(0)} mm and would run. Close the tier gap or `
+         + `keep one tier.`;
   } else {
     cls = "bad";
-    text = `${measured} mm measured, ${d.liftToTier1.toFixed(0)} mm needed just to fill `
-         + `tier 1. An air stone cannot drive this tower. Options: stay with V1, wait for `
-         + `the roots to grow and use one shared reservoir, or fit a 5 V submersible pump.`;
+    text = `${m} mm measured, ${d.liftToTier1.toFixed(0)} mm needed just to fill the lower `
+         + `basin. An air pump cannot drive this. Stay with V1, or fit a 5 V submersible pump.`;
   }
   vEl.className = "verdict " + cls;
   vEl.textContent = text;
 
-  const checks = [
-    ["Lift to tier 2 spout",
-     `${d.liftToSpout.toFixed(0)} mm needed`,
-     measured === 0 ? "warn" : (measured >= d.liftToSpout ? "ok" : "bad")],
+  const rows = [
+    ["Tube stays 70 % submerged",
+     `${ratioPct} % now; discharge may not exceed ${d.maxDischargeZ.toFixed(0)} mm, ` +
+     `it is at ${d.dischargeZ.toFixed(0)} mm`,
+     d.submergeRatio >= P.SUBMERGE_MIN ? "ok" : "bad"],
 
-    ["Lift to fill tier 1",
-     `${d.liftToTier1.toFixed(0)} mm needed`,
-     measured === 0 ? "warn" : (measured >= d.liftToTier1 ? "ok" : "bad")],
+    ["Lift to the discharge",
+     `${d.liftToDischarge.toFixed(0)} mm needed above the reservoir surface`,
+     m === 0 ? "warn" : (m >= d.liftToDischarge ? "ok" : "bad")],
 
-    ["Cup fits inside trough",
-     `cup reaches r=${(d.t1.ring + d.cupOuterR).toFixed(1)}, trough wall at ` +
-     `r=${(d.t1.rOut - d.W).toFixed(1)}`,
-     d.t1.ring + d.cupOuterR <= d.t1.rOut - d.W ? "ok" : "bad"],
+    ["Air barb stays under water",
+     `barb at ${P.BARB_Z} mm, surface at ${S.water} mm`,
+     P.BARB_Z < S.water - 5 ? "ok" : "bad"],
 
-    ["Cup spacing, tier 1",
-     `${d.cupPitch1.toFixed(1)} mm centre to centre, needs >= ${(S.cup + 8)} mm`,
-     d.cupPitch1 >= S.cup + 8 ? "ok" : "bad"],
+    ["Funnel intake clears the base",
+     `&#216;${P.FUNNEL_D} funnel inside the &#216;54 mesh base foot`,
+     P.FUNNEL_D < 54 ? "ok" : "bad"],
 
     ["Planting hole takes a root ball",
-     `${S.cup} mm, V1 proved 26 mm is the floor`,
+     `${S.cup} mm; V1 proved 26 mm is the floor`,
      S.cup >= 26 ? "ok" : "bad"],
 
-    ["Room left for decorative holes",
-     d.freeRim > 0 ? `${d.freeRim.toFixed(1)} mm of free rim`
-                   : `none - cups reach the disc edge`,
-     d.freeRim >= 12 ? "ok" : (d.freeRim > 0 ? "warn" : "bad")],
+    ["Hole sits inside its lobe",
+     `hole radius ${d.cupOuterR.toFixed(1)}, lobe inner radius ` +
+     `${(d.lobeR - d.W).toFixed(1)}`,
+     d.t1.cupFits ? "ok" : "bad"],
 
-    ["Column passes the glass mouth",
-     `&#216;${(P.COL_OUTER_R * 2)} column vs &#216;90 mouth. The base is the V1 part, ` +
-     `already proven to go in.`,
-     P.COL_OUTER_R * 2 < P.MOUTH_CLEAR_D ? "ok" : "bad"],
+    ["Lower tier hole spacing",
+     `${d.t1.pitch.toFixed(1)} mm centre to centre, needs >= ${S.cup + 8} mm`,
+     d.t1.pitch >= S.cup + 8 ? "ok" : "bad"],
 
-    ["Return holes outflow the airlift tube",
-     `${P.RETURN_HOLES}x&#216;${P.RETURN_HOLE_D} = ` +
-     `${(P.RETURN_HOLES * Math.PI * (P.RETURN_HOLE_D / 2) ** 2).toFixed(0)} mm&sup2; vs tube ` +
-     `${(Math.PI * (P.TUBE_ID / 2) ** 2).toFixed(0)} mm&sup2;, needs 2x`,
-     P.RETURN_HOLES * (P.RETURN_HOLE_D / 2) ** 2 >= 2 * (P.TUBE_ID / 2) ** 2 ? "ok" : "warn"],
+    ["Upper tier hole spacing",
+     `${d.t2.pitch.toFixed(1)} mm centre to centre, needs >= ${S.cup + 8} mm`,
+     d.t2.pitch >= S.cup + 8 ? "ok" : "bad"],
 
-    ["Splash guard outlet is under water",
-     S.guard ? `channel ends ${P.GUARD_SUBMERGE} mm below the trough surface - the air `
-             + `peels off along the open channel and the water arrives already submerged`
-             : `guard removed - the water/air mixture leaves in open air ${
-                 (d.elbowZ - d.troughWater2).toFixed(0)} mm above the surface and the `
-             + `bursting bubbles throw droplets`,
-     S.guard ? "ok" : "warn"],
+    ["Light reaches the lower tier",
+     `upper tier is ${d.t2.shortAxis.toFixed(0)} mm across the waist and turned 90&deg;, ` +
+     `lower holes sit at r=${d.t1.lobeC.toFixed(0)} mm`,
+     d.t2.shortAxis / 2 <= d.t1.lobeC - d.cupOuterR ? "ok"
+       : d.t2.shortAxis / 2 <= d.t1.lobeC ? "warn" : "bad"],
 
-    ["Splash guard fits the trough",
-     `part ${(P.GUARD_CHANNEL_W + 2 * P.GUARD_WALL).toFixed(1)} mm wide, trough floor ` +
-     `${(d.t2.floorR1 - d.t2.floorR0).toFixed(1)} mm - ` +
-     `${d.guardSlack.toFixed(1)} mm of slack`,
-     !S.guard ? "ok" : (d.guardSlack >= 2 ? "ok" : d.guardSlack > 0 ? "warn" : "bad")],
+    ["Overflow sill at the working depth",
+     `notch sills ${P.WATER_IN_TROUGH} mm above each floor, ` +
+     `${P.NOTCH_W} mm wide, one per lobe - water leaves down the tube, not through the floor`,
+     "ok"],
 
-    ["Guard socket clears the trough rim",
-     `socket &#216;${d.socketOD.toFixed(1)} sits ${P.ELBOW_ABOVE_RIM} mm above the rim; ` +
-     `it is wider than the ${(d.t2.floorR1 - d.t2.floorR0).toFixed(1)} mm trough so it ` +
-     `must stay outside`,
-     !S.guard ? "ok" : (d.elbowZ >= d.rimZ ? "ok" : "bad")],
+    ["Basin runs through the waist",
+     `${d.t2.waistChannel.toFixed(1)} mm channel at the upper waist, ` +
+     `${d.t1.waistChannel.toFixed(1)} mm at the lower one`,
+     Math.min(d.t1.waistChannel, d.t2.waistChannel) >= 6 ? "ok" : "bad"],
 
-    ["Splash guard clears the tier 2 cups",
-     `${d.guardToCup.toFixed(1)} mm to the nearest cup centre, cup radius ` +
-     `${d.cupOuterR.toFixed(1)} mm`,
-     !S.guard ? "ok"
-              : (d.guardToCup - d.cupOuterR >= P.GUARD_CHANNEL_W / 2 + 3 ? "ok" : "warn")],
+    ["The waist actually pinches",
+     d.t2.pinched
+       ? `upper tier ${d.t2.span} x ${d.t2.shortAxis.toFixed(0)} mm - a real peanut`
+       : `waist forced out to ${(d.t2.shortAxis / 2).toFixed(0)} mm to keep the basin ` +
+         `joined, so the tier is round again. Widen the upper tier and the pinch returns.`,
+     d.t2.pinched ? "ok" : "warn"],
+
+    ["Catch dish holds the discharge",
+     S.dish ? `${d.dishL} x ${d.dishW.toFixed(1)} mm trough sat in the waist, clear of both `
+            + `planting holes; overflows along its length instead of jetting`
+            : `dish removed - the mixture drops into open air and the bursting bubbles spit`,
+     S.dish ? (d.dishW >= 4 ? "ok" : "warn") : "warn"],
+
+    ["Tube and base pass the glass mouth",
+     `&#216;${P.TUBE_OD} tube, &#216;${P.FUNNEL_D} funnel vs &#216;90 mouth`,
+     P.FUNNEL_D < P.MOUTH_CLEAR_D ? "ok" : "bad"],
 
     ["Tipping margin",
-     S.t1dia > 90 ? `&#216;${S.t1dia} disc overhangs the glass - knocks it over more easily`
-                  : `&#216;${S.t1dia} disc stays inside the glass footprint`,
-     S.t1dia > 90 ? "warn" : "ok"],
+     S.t1 > 90 ? `&#216;${S.t1} lower tier overhangs the glass`
+               : `&#216;${S.t1} stays inside the glass footprint`,
+     S.t1 > 90 ? "warn" : "ok"],
   ];
 
-  document.getElementById("checks").innerHTML = checks.map(([name, detail, st]) =>
+  document.getElementById("checks").innerHTML = rows.map(([n, det, st]) =>
     `<li><span class="mark m-${st}">${st === "ok" ? "✓" : st === "warn" ? "!" : "✗"}</span>` +
-    `<span><b>${name}</b><br><span style="color:var(--sub)">${detail}</span></span></li>`).join("");
+    `<span><b>${n}</b><br><span style="color:var(--sub)">${det}</span></span></li>`).join("");
 }
 
-// ═════════════════════════════════════════════════ điều khiển giao diện
-function bindSlider(id, key, fmt) {
+// ═════════════════════════════════════════════════ giao diện
+function slider(id, key, fmt) {
   const el = document.getElementById("s-" + id), out = document.getElementById("v-" + id);
-  const sync = () => {
-    S[key] = Number(el.value);
-    out.textContent = fmt(S[key]);
-    rebuild();
-  };
+  const sync = () => { S[key] = Number(el.value); out.textContent = fmt(S[key]); rebuild(); };
   el.addEventListener("input", sync);
   sync();
 }
+slider("t2",    "t2",    v => "Ø" + v);
+slider("waist", "waist", v => v + " %");
+slider("rise",  "rise",  v => v + " mm");
+slider("cup",   "cup",   v => "Ø" + v);
+slider("water", "water", v => v + " mm");
+slider("lift",  "lift",  v => v === 0 ? "not measured" : v + " mm");
 
-bindSlider("rise",  "rise",  v => v + " mm");
-bindSlider("cup",   "cup",   v => "Ø" + v);
-bindSlider("rim",   "rim",   v => v + " mm");
-bindSlider("water", "water", v => v + " mm");
-bindSlider("lift",  "lift",  v => v === 0 ? "not measured" : v + " mm");
-
-function setDia(d) {
-  S.t1dia = d;
-  document.getElementById("b-84").setAttribute("aria-pressed", String(d === 84));
-  document.getElementById("b-110").setAttribute("aria-pressed", String(d === 110));
+function setT1(v) {
+  S.t1 = v;
+  document.getElementById("b-84").setAttribute("aria-pressed", String(v === 84));
+  document.getElementById("b-110").setAttribute("aria-pressed", String(v === 110));
   rebuild();
 }
-document.getElementById("b-84").onclick = () => setDia(84);
-document.getElementById("b-110").onclick = () => setDia(110);
-document.getElementById("b-glass").onclick = e => {
-  S.glass = !S.glass;
-  e.currentTarget.setAttribute("aria-pressed", String(S.glass));
-  rebuild();
-};
-document.getElementById("b-guard").onclick = e => {
-  S.guard = !S.guard;
-  e.currentTarget.textContent = S.guard ? "clipped on" : "removed";
-  e.currentTarget.setAttribute("aria-pressed", String(S.guard));
-  rebuild();
-};
+document.getElementById("b-84").onclick = () => setT1(84);
+document.getElementById("b-110").onclick = () => setT1(110);
 
-function setView(zoom) {
-  S.zoom = zoom;
-  document.getElementById("b-zoom").setAttribute("aria-pressed", String(zoom));
-  document.getElementById("b-whole").setAttribute("aria-pressed", String(!zoom));
+function toggle(id, key, on, off) {
+  document.getElementById(id).onclick = e => {
+    S[key] = !S[key];
+    e.currentTarget.textContent = S[key] ? on : off;
+    e.currentTarget.setAttribute("aria-pressed", String(S[key]));
+    rebuild();
+  };
+}
+toggle("b-glass", "glass", "glass + water", "glass hidden");
+toggle("b-dish",  "dish",  "catch dish", "dish removed");
+
+const cam = { theta: -Math.PI / 2.35, phi: 1.22, dist: 400,
+              target: new THREE.Vector3(0, 0, 80) };
+function setView(v) {
+  S.view = v;
+  for (const [id, name] of [["b-whole", "whole"], ["b-foot", "foot"], ["b-top", "top"]])
+    document.getElementById(id).setAttribute("aria-pressed", String(v === name));
   const d = derive();
-  if (zoom) {
-    S.glass = false;
-    document.getElementById("b-glass").setAttribute("aria-pressed", "false");
-    cam.target.set(d.spoutR * 0.62, 0, (d.elbowZ + d.guardEndZ) / 2 + 2);
-    cam.dist = 78; cam.theta = -0.95; cam.phi = 1.28;
+  if (v === "foot") {
+    cam.target.set(12, 0, P.BARB_Z); cam.dist = 110; cam.theta = -0.5; cam.phi = 1.45;
+  } else if (v === "top") {
+    cam.target.set(P.BEND_R * 1.4, 0, d.dischargeZ - 6);
+    cam.dist = 110; cam.theta = -0.75; cam.phi = 1.2;
   } else {
-    cam.target.set(0, 0, 80);
-    cam.dist = 330; cam.theta = -Math.PI / 2.3; cam.phi = 1.25;
+    cam.target.set(0, 0, 80); cam.dist = 400;
+    cam.theta = -Math.PI / 2.35; cam.phi = 1.22;
   }
-  rebuild();
 }
-document.getElementById("b-zoom").onclick = () => setView(true);
-document.getElementById("b-whole").onclick = () => setView(false);
+document.getElementById("b-whole").onclick = () => setView("whole");
+document.getElementById("b-foot").onclick  = () => setView("foot");
+document.getElementById("b-top").onclick   = () => setView("top");
 
 // ═════════════════════════════════════════════════ xoay / phóng / dời
-const cam = { theta: -Math.PI / 2.3, phi: 1.25, dist: 330,
-              target: new THREE.Vector3(0, 0, 80) };
 function applyCamera() {
   const sp = Math.sin(cam.phi), cp = Math.cos(cam.phi);
   camera.position.set(cam.target.x + cam.dist * sp * Math.cos(cam.theta),
@@ -623,7 +702,7 @@ stage.addEventListener("pointermove", ev => {
 stage.addEventListener("contextmenu", ev => ev.preventDefault());
 stage.addEventListener("wheel", ev => {
   ev.preventDefault();
-  cam.dist = Math.min(1600, Math.max(60, cam.dist * Math.exp(ev.deltaY * 0.001)));
+  cam.dist = Math.min(1800, Math.max(60, cam.dist * Math.exp(ev.deltaY * 0.001)));
 }, { passive: false });
 
 function resize() {
@@ -634,7 +713,7 @@ function resize() {
 }
 addEventListener("resize", resize);
 resize();
-setDia(110);
+setT1(110);
 
 (function loop() {
   requestAnimationFrame(loop);
