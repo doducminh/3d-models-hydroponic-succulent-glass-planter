@@ -17,11 +17,17 @@ STL files, not a simplified stand-in.
 To publish it on the web, enable GitHub Pages (Settings → Pages → Source: main,
 folder `/`) and it becomes browsable at `/viewer/`.
 
-[`viewer/v2-tower.html`](viewer/v2-tower.html) is a separate, **speculative** page: a
-parametric study of a two-tier version that would hold six plants instead of four,
-with the water lifted by an aquarium air stone. Nothing on that page is printable —
-it exists to test whether the idea survives contact with the numbers before any CAD
-is drawn. Move its top slider and it tells you.
+Two further pages are **speculative design studies**, not products — nothing on them
+is printable yet. They exist to test ideas against the numbers before any CAD is drawn.
+
+[`viewer/v3-tilted-tray.html`](viewer/v3-tilted-tray.html) is the live one: a single
+tray leaning on the glass's slanted rim, carrying six *level* pots that each hold a
+reserve of water when the pump is off.
+
+[`viewer/v2-tower.html`](viewer/v2-tower.html) is a two-tier airlift tower, **dropped**.
+An uplift tube has to stay about 70 % submerged, and a 74 mm deep reservoir caps the
+discharge near 104 mm while the second tier needs 149 mm. Kept because a rejected idea
+with a reason attached is worth more than a deleted one.
 
 ## Parts
 

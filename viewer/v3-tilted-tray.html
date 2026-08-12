@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<!--
+  V3 single tilted tray, six level pots — parametric design study.
+
+  Nothing here is printable yet. Geometry is built in JavaScript so the numbers can
+  be judged before any CAD exists. Self-contained: no local files, no server.
+
+  The two-tier airlift tower (viewer/v2-tower.html) was dropped: an uplift tube has
+  to stay ~70 % submerged, and a 74 mm deep reservoir caps the discharge at about
+  104 mm, far below where a second tier has to sit.
+
+  The idea that makes this version work: the TRAY is tilted to sit on the glass's
+  slanted rim, but every POT stays level, and each pot keeps a reserve of water when
+  the pump is off. The tray prints flat in its own plane; the pots are separate parts
+  that print upright. Nothing needs support.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tilted Tray, Level Pots — design study</title>
+<style>
+  :root{--bg:#FAF6F2;--ink:#2A2320;--sub:#6B5F58;--line:#E4D9D1;--accent:#C08A8E;--teal:#5C7F72;}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Avenir Next','Segoe UI',system-ui,sans-serif}
+  header{padding:16px 18px 10px}
+  h1{margin:0;font-size:16px;font-weight:600}
+  header p{margin:6px 0 0;font-size:12px;color:var(--sub);line-height:1.55;max-width:800px}
+  #stage{position:relative;width:100%;height:56vh;min-height:340px;touch-action:none;cursor:grab}
+  #stage.grabbing{cursor:grabbing}
+  canvas{display:block}
+  #err{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    padding:24px;text-align:center;font-size:13.5px;color:var(--sub)}
+  #err.on{display:flex}
+  .panel{padding:12px 18px 26px;display:grid;gap:18px;
+    grid-template-columns:repeat(auto-fit,minmax(310px,1fr));max-width:1200px}
+  .card h2{margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--sub)}
+  .card h2+h2,.card .row+h2{margin-top:16px}
+  .row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  label{font-size:12px;color:var(--sub);min-width:124px}
+  input[type=range]{flex:1;min-width:100px;accent-color:var(--accent)}
+  .val{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;min-width:62px;
+    text-align:right}
+  button{font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);border-radius:20px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--accent)}
+  button[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+  .verdict{padding:11px 14px;border-radius:10px;font-size:13px;line-height:1.55;
+    margin-bottom:12px}
+  .ok{background:#DFEADF;color:#33513C}
+  .warn{background:#F6E5D6;color:#7C4F22}
+  .bad{background:#F5DADA;color:#7E3232}
+  ul.checks{list-style:none;margin:0;padding:0;font-size:12.5px;line-height:1.6}
+  ul.checks li{padding:5px 0;border-bottom:1px solid var(--line);display:flex;gap:9px}
+  ul.checks li:last-child{border-bottom:0}
+  .mark{flex:0 0 15px;font-weight:700}
+  .m-ok{color:var(--teal)} .m-warn{color:#B07A3C} .m-bad{color:#B04A4A}
+  .note{font-size:11.5px;color:var(--sub);line-height:1.65;max-width:800px;
+    padding:0 18px 26px}
+  .note b{color:var(--accent)}
+  code{background:#F0E8E2;padding:1px 5px;border-radius:4px;font-size:11px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tilted Tray, Level Pots — design study</h1>
+  <p>One tier, six plants. The tray leans on the glass's slanted rim; every pot stays
+     level and holds a reserve of water, so switching the pump off does not leave the
+     roots dry. <b>No printable files exist yet.</b> Drag to rotate, scroll to zoom,
+     hold Shift to pan.</p>
+</header>
+
+<div id="stage"><div id="err"></div></div>
+
+<div class="panel">
+
+  <div class="card">
+    <h2>Feed</h2>
+    <div class="row">
+      <label>Measured lift</label>
+      <input type="range" id="s-lift" min="0" max="90" step="1" value="0">
+      <span class="val" id="v-lift">not measured</span>
+    </div>
+    <div class="verdict" id="verdict"></div>
+
+    <h2>Geometry</h2>
+    <div class="row">
+      <label>Tray tilt</label>
+      <input type="range" id="s-tilt" min="0" max="213" step="3" value="213">
+      <span class="val" id="v-tilt"></span>
+    </div>
+    <div class="row">
+      <label>Tray span</label>
+      <input type="range" id="s-tray" min="100" max="145" step="1" value="122">
+      <span class="val" id="v-tray"></span>
+    </div>
+    <div class="row">
+      <label>Pot bore</label>
+      <input type="range" id="s-pot" min="24" max="34" step="1" value="28">
+      <span class="val" id="v-pot"></span>
+    </div>
+    <div class="row">
+      <label>Water kept</label>
+      <input type="range" id="s-keep" min="4" max="24" step="1" value="14">
+      <span class="val" id="v-keep"></span>
+    </div>
+    <div class="row">
+      <label>Reservoir level</label>
+      <input type="range" id="s-water" min="50" max="76" step="1" value="74">
+      <span class="val" id="v-water"></span>
+    </div>
+    <div class="row">
+      <label>Water moved by</label>
+      <button id="b-air" aria-pressed="true">air stone uplift</button>
+      <button id="b-pump" aria-pressed="false">5 V pump</button>
+    </div>
+
+    <h2>View</h2>
+    <div class="row">
+      <label>Show</label>
+      <button id="b-glass" aria-pressed="true">glass + water</button>
+      <button id="b-tray" aria-pressed="true">tray</button>
+    </div>
+    <div class="row">
+      <label>Camera</label>
+      <button id="b-whole" aria-pressed="true">whole thing</button>
+      <button id="b-cut" aria-pressed="false">pot section</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Checks</h2>
+    <ul class="checks" id="checks"></ul>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Why the pots are separate parts.</b> A tray that leans 21.3&deg; but carries level
+  pots cannot be printed in one piece: whichever way you lay it down, either the tray
+  underside or the pot floors end up as a shallow ramp, and a shallow ramp is a severe
+  overhang. Splitting solves it completely &mdash; the tray prints flat in its own
+  plane with the pot seats as tilted countersinks opening upwards, and each pot prints
+  upright on its own flat bottom. No supports anywhere, and the pots lift out for
+  cleaning. This is the same trick V1 used: <em>splitting a part unlocks shapes.</em>
+  <br><br>
+  <b>Why each pot keeps water.</b> The outlet from each pot is a notch part-way up its
+  wall, not a hole in its floor. Below the notch sill the water has nowhere to go, so
+  turning the pump off leaves that depth standing in every pot. A hole in the floor
+  would drain all six back into the glass and leave the roots in air.
+  <br><br>
+  <b>The tilt is the plumbing.</b> Because the tray leans, the six pots sit at six
+  different heights. Water fed to the highest one fills it to its sill, spills onto the
+  tray surface, runs downhill into the next pot's inlet notch, and so on down to the
+  lowest pot, which spills off the low edge of the tray back into the glass. No channels,
+  no pipes between pots &mdash; the slope does the work. At zero tilt there is no
+  cascade at all, which is why the tilt slider has a floor.
+  <br><br>
+  <b>The glass, measured.</b> Inner mouth &#216;90 across and 96.6 mm along the slope,
+  rim leaning 21.3&deg; with a 35 mm rise, 80 mm from the base to the low side of the rim
+  and 115 mm to the high side. Those are real measurements. The bulge of the body and the
+  curve of the base are interpolated from a photograph.
+  <br><br>
+  <b>The 70 % rule still applies.</b> An uplift tube needs most of its length under water,
+  so with a 74 mm reservoir it cannot discharge much above 104 mm. A tray leaning the full
+  21.3&deg; puts its top pot near 115 mm, out of reach &mdash; the checks say which pots the
+  airlift can actually feed. Reduce the tilt, or use a small 5 V submersible pump.
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═════════════════════════════════════════════════ số đo ly — ĐÃ ĐO THẬT
+const GLASS = {
+  MOUTH_R: 45,              // miệng lòng trong Ø90 (hình chiếu bằng là vòng tròn)
+  RIM_LOW_Z: 80, RIM_HIGH_Z: 115,
+  TILT_DEG: 21.3,           // độ nghiêng miệng
+};
+GLASS.RIM_MID_Z = (GLASS.RIM_LOW_Z + GLASS.RIM_HIGH_Z) / 2;
+
+const P = {
+  N_POTS: 6,
+  TRAY_T: 4,                // dày mâm
+  SEAT_LIP: 2.5,            // gờ đỡ quanh mỗi lỗ, mặt gờ NẰM NGANG
+  POT_WALL: 2.5, POT_H: 30, POT_FLOOR: 2.5,
+  POT_FLANGE: 3,            // vành pot ngồi lên gờ đỡ
+  NOTCH_W: 7,               // bề rộng khe vào / khe tràn
+  CLEARANCE: 0.30,          // P.clearance("sliding") — pot phải rút ra được để rửa
+
+  // airlift, giữ nguyên từ V2
+  TUBE_ID: 7, TUBE_OD: 11, FOOT_Z: 4, FUNNEL_H: 14, FUNNEL_D: 30,
+  BARB_D: 5, BARB_LEN: 9, BARB_Z: 16, SUBMERGE_MIN: 0.70,
+  BED: 215,                 // vùng in dùng thật của Neptune 4
+};
+
+const S = { lift: 0, tilt: 213, tray: 122, pot: 28, keep: 14, water: 74,
+            glass: true, tray_on: true, view: "whole", pump: false };
+
+// Bơm chìm 5V loại nhỏ: cột áp 40–80cm, gấp nhiều lần mức cần ở đây, và nó
+// KHÔNG quan tâm tới độ ngập ống — đó là điểm khác biệt so với airlift.
+const PUMP_HEAD_MM = 400;
+
+const stage = document.getElementById("stage");
+const errEl = document.getElementById("err");
+if (typeof THREE === "undefined") {
+  errEl.textContent = "Could not load the three.js library - check your connection and reload.";
+  errEl.classList.add("on");
+  throw new Error("three.js not loaded");
+}
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xFAF6F2);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 20000);
+camera.up.set(0, 0, 1);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+stage.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f78, 0.95));
+const keyLight = new THREE.DirectionalLight(0xffffff, 0.55);
+keyLight.position.set(1, -1.4, 2);
+scene.add(keyLight);
+const grid = new THREE.GridHelper(240, 24, 0xD8CCC4, 0xEBE2DB);
+grid.rotation.x = Math.PI / 2;
+scene.add(grid);
+const model = new THREE.Group();
+scene.add(model);
+
+const C = { tray: 0x8FAF9F, pot: 0xB4737A, tube: 0x7FA8BD, glass: 0x9FB8C4,
+            water: 0x6FA8C0, base: 0x5C7F72, hose: 0x4A4A4A, pump: 0x585858,
+            seat: 0xD98E3F };
+const mat = (c, o) => new THREE.MeshLambertMaterial({
+  color: c, side: THREE.DoubleSide,
+  transparent: o !== undefined, opacity: o ?? 1, depthWrite: o === undefined });
+
+function lathe(pts, color, opacity, seg = 96) {
+  const g = new THREE.LatheGeometry(
+    pts.map(([r, h]) => new THREE.Vector2(Math.max(r, 1e-4), h)), seg);
+  g.rotateX(Math.PI / 2); g.computeVertexNormals();
+  return new THREE.Mesh(g, mat(color, opacity));
+}
+function tube(r, z0, z1, color, opacity) {
+  const g = new THREE.CylinderGeometry(r, r, Math.max(z1 - z0, 0.01), 40, 1, true);
+  g.rotateX(Math.PI / 2); g.translate(0, 0, (z0 + z1) / 2);
+  return new THREE.Mesh(g, mat(color, opacity));
+}
+const V2 = p => new THREE.Vector2(p[0], p[1]);
+function shapeOf(outer, holes = []) {
+  const s = new THREE.Shape(outer.map(V2));
+  holes.forEach(h => s.holes.push(new THREE.Path(h.map(V2))));
+  return s;
+}
+function ellipsePts(cx, cy, a, b, cw = false, seg = 56) {
+  const out = [];
+  for (let i = 0; i < seg; i++) {
+    const t = (cw ? -1 : 1) * 2 * Math.PI * i / seg;
+    out.push([cx + a * Math.cos(t), cy + b * Math.sin(t)]);
+  }
+  return out;
+}
+const circlePts = (r, cw, seg) => ellipsePts(0, 0, r, r, cw, seg);
+
+// Vành ly cắt xiên: tường đứng, mép trên cao thấp theo góc — dựng tay vì lathe
+// không cắt xiên được.
+function slantedRing(rIn, rOut, zBase, zAt, seg = 96) {
+  const pos = [], idx = [];
+  for (let i = 0; i <= seg; i++) {
+    const a = 2 * Math.PI * i / seg, c = Math.cos(a), s = Math.sin(a);
+    const zt = zAt(a);
+    pos.push(rIn * c, rIn * s, zBase,  rIn * c, rIn * s, zt,
+             rOut * c, rOut * s, zBase, rOut * c, rOut * s, zt);
+  }
+  for (let i = 0; i < seg; i++) {
+    const k = i * 4, n = (i + 1) * 4;
+    idx.push(k, k + 1, n + 1, k, n + 1, n);            // mặt trong
+    idx.push(k + 2, n + 2, n + 3, k + 2, n + 3, k + 3); // mặt ngoài
+    idx.push(k + 1, k + 3, n + 3, k + 1, n + 3, n + 1); // mép trên
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+
+// ═════════════════════════════════════════════════ suy ra kích thước
+function derive() {
+  const tiltDeg = S.tilt / 10;
+  const t = Math.tan(tiltDeg * Math.PI / 180);
+  const trayR = S.tray / 2;
+  const potOuterR = S.pot / 2 + P.POT_WALL;
+  const seatR = potOuterR + P.CLEARANCE;              // lỗ trên mâm
+  const ringR = Math.max(trayR - seatR - P.SEAT_LIP - 3, 1);
+
+  // Mâm nghiêng tựa lên vành ly. Cùng góc nghiêng thì mâm song song vành,
+  // đặt cao hơn vành 1mm cho khỏi kê.
+  const trayZ0 = GLASS.RIM_MID_Z + 1;
+  const planeZ = (x) => trayZ0 + x * t;
+
+  const pots = [];
+  for (let i = 0; i < P.N_POTS; i++) {
+    const a = 2 * Math.PI * i / P.N_POTS;             // 0° = phía CAO
+    const x = ringR * Math.cos(a), y = ringR * Math.sin(a);
+    const seatZ = planeZ(x);
+    pots.push({ i, a, x, y, seatZ,
+                floorZ: seatZ - P.POT_FLANGE,        // sàn pot, NẰM NGANG
+                waterZ: seatZ - P.POT_FLANGE + P.POT_FLOOR + S.keep,
+                rimZ: seatZ - P.POT_FLANGE + P.POT_H });
+  }
+  const sorted = pots.slice().sort((p, q) => q.seatZ - p.seatZ);
+
+  // Bậc nước phải đo DỌC THEO ĐƯỜNG CHẢY, không phải giữa mọi cặp đã sắp xếp:
+  // sáu pot cách đều thì có hai cặp cùng cao độ đối xứng nhau, sắp xếp ra bậc 0
+  // trong khi thực tế nước chảy thành hai nhánh từ pot cao nhất xuống pot thấp nhất.
+  let minStep = Infinity;
+  const half = P.N_POTS / 2;
+  for (const dir of [1, -1]) {
+    for (let k = 0; k < half; k++) {
+      const a = pots[(k * dir + P.N_POTS) % P.N_POTS];
+      const b = pots[((k + 1) * dir + P.N_POTS) % P.N_POTS];
+      minStep = Math.min(minStep, a.seatZ - b.seatZ);
+    }
+  }
+  if (!isFinite(minStep)) minStep = 0;
+
+  const topPot = sorted[0], lowPot = sorted[sorted.length - 1];
+  const dischargeZ = topPot.rimZ + 4;                 // đầu ra rót vào pot cao nhất
+  const tubeLen = dischargeZ - P.FOOT_Z;
+  const submerged = Math.max(0, Math.min(S.water, dischargeZ) - P.FOOT_Z);
+  const maxDischargeZ = P.FOOT_Z + (S.water - P.FOOT_Z) / P.SUBMERGE_MIN;
+
+  return {
+    tiltDeg, t, trayR, potOuterR, seatR, ringR, trayZ0, planeZ,
+    pots, sorted, topPot, lowPot, minStep,
+    pitch: 2 * ringR * Math.sin(Math.PI / P.N_POTS),
+    dischargeZ, tubeLen, submerged, submergeRatio: submerged / tubeLen, maxDischargeZ,
+    liftNeeded: dischargeZ - S.water,
+    reachable: pots.filter(p => p.waterZ <= maxDischargeZ).length,
+    bearing: trayR - GLASS.MOUTH_R,
+    trayPlanSpan: 2 * trayR,
+    // mâm in NẰM trong mặt phẳng riêng -> khổ in là đường kính thật
+    printSpan: 2 * trayR,
+  };
+}
+
+// ═════════════════════════════════════════════════ dựng
+function rebuild() {
+  const d = derive();
+  while (model.children.length) model.remove(model.children[0]);
+
+  const rimZAt = a => GLASS.RIM_MID_Z +
+        GLASS.MOUTH_R * Math.cos(a) * Math.tan(GLASS.TILT_DEG * Math.PI / 180);
+
+  if (S.glass) {
+    // thân ly tới z=62 (biên dạng phình là NỘI SUY), rồi vành cắt xiên
+    model.add(lathe([[0, 0], [40, 0], [44, 14], [46.5, 40], [45.2, 62],
+                     [48.2, 62], [49.5, 40], [47, 14], [43, 0], [0, 0]],
+                    C.glass, 0.16));
+    model.add(new THREE.Mesh(slantedRing(45.2, 48.2, 62, rimZAt), mat(C.glass, 0.16)));
+    model.add(lathe([[0, 0], [43.5, 0], [44.6, 30], [44.2, S.water], [0, S.water], [0, 0]],
+                    C.water, 0.22));
+  }
+
+  // đế lưới V1, tái dùng nguyên — đỡ ống nâng và tự căn tâm
+  model.add(lathe([[27, 0], [30, 0], [38, 62], [45.6, 67], [43, 67], [35, 62], [27, 0]],
+                  C.base));
+
+  // ── ống nâng airlift: phễu hút -> cút cắm dây khí -> ống -> đầu ra
+  model.add(lathe([[P.FUNNEL_D / 2, 0], [P.TUBE_OD / 2, P.FUNNEL_H],
+                   [P.TUBE_ID / 2, P.FUNNEL_H], [P.FUNNEL_D / 2 - 2, 0.5],
+                   [P.FUNNEL_D / 2, 0]], C.tube, undefined, 48).translateZ(P.FOOT_Z));
+  model.add(tube(P.TUBE_OD / 2, P.FOOT_Z + P.FUNNEL_H, d.dischargeZ, C.tube));
+  const barb = new THREE.Mesh(
+    new THREE.CylinderGeometry(P.BARB_D / 2, P.BARB_D / 2 + 0.8, P.BARB_LEN, 20), mat(C.tube));
+  barb.geometry.rotateZ(Math.PI / 2);
+  barb.geometry.translate(P.TUBE_OD / 2 + P.BARB_LEN / 2, 0, 0);
+  barb.position.z = P.BARB_Z;
+  model.add(barb);
+
+  // ống bẻ ngang, rót vào pot cao nhất
+  const reach = Math.hypot(d.topPot.x, d.topPot.y);
+  const outlet = new THREE.Group();
+  outlet.rotation.z = d.topPot.a;
+  const bend = new THREE.Mesh(
+    new THREE.TorusGeometry(Math.max(reach, 5), P.TUBE_OD / 2, 10, 28, Math.PI / 2), mat(C.tube));
+  bend.geometry.rotateX(Math.PI / 2);
+  bend.position.set(Math.max(reach, 5), 0, d.dischargeZ);
+  bend.rotation.z = Math.PI;
+  outlet.add(bend);
+  model.add(outlet);
+
+  // dây khí + máy sủi, đều NGOÀI ly
+  model.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+    new THREE.Vector3(P.TUBE_OD / 2 + P.BARB_LEN, 0, P.BARB_Z),
+    new THREE.Vector3(34, -8, P.BARB_Z - 2), new THREE.Vector3(46, -12, 44),
+    new THREE.Vector3(50, -14, 92), new THREE.Vector3(70, -16, 78),
+    new THREE.Vector3(88, -16, 30), new THREE.Vector3(96, -16, 12),
+  ]), 60, 2.2, 10, false), mat(C.hose)));
+  const pump = new THREE.Mesh(new THREE.BoxGeometry(30, 24, 22), mat(C.pump));
+  pump.position.set(112, -16, 11);
+  model.add(pump);
+
+  // ── MÂM NGHIÊNG: đĩa phẳng, 6 lỗ. Lỗ là HÌNH BẦU DỤC vì pot dựng thẳng đứng
+  // cắt qua mặt phẳng nghiêng — lỗ tròn thì pot không lọt.
+  if (S.tray_on) {
+    const holes = d.pots.map(p => {
+      const a = d.seatR / Math.cos(d.tiltDeg * Math.PI / 180);   // trục theo phương dốc
+      const lx = p.x / Math.cos(d.tiltDeg * Math.PI / 180);      // toạ độ trong mp mâm
+      return ellipsePts(lx, p.y, a, d.seatR, true);
+    });
+    const shape = shapeOf(circlePts(d.trayR / Math.cos(d.tiltDeg * Math.PI / 180) * 0 + d.trayR),
+                          holes);
+    const g = new THREE.ExtrudeGeometry(shape,
+      { depth: P.TRAY_T, bevelEnabled: false, curveSegments: 48, steps: 1 });
+    g.computeVertexNormals();
+    const tray = new THREE.Mesh(g, mat(C.tray));
+    tray.rotation.y = -d.tiltDeg * Math.PI / 180;   // nghiêng theo miệng ly
+    tray.position.z = d.trayZ0;
+    model.add(tray);
+  }
+
+  // ── SÁU POT: rời, thẳng đứng, sàn NẰM NGANG, giữ nước khi tắt bơm
+  for (const p of d.pots) {
+    const rOut = d.potOuterR, rIn = S.pot / 2;
+    const pot = lathe([[0, 0], [rOut, 0], [rOut, P.POT_H],
+                       [rOut + P.SEAT_LIP, P.POT_H],
+                       [rOut + P.SEAT_LIP, P.POT_H - P.POT_FLANGE],
+                       [rIn, P.POT_H - P.POT_FLANGE], [rIn, P.POT_FLOOR], [0, P.POT_FLOOR],
+                       [0, 0]], C.pot, undefined, 56);
+    pot.position.set(p.x, p.y, p.floorZ);
+    model.add(pot);
+
+    // nước đọng lại — đây là điểm mấu chốt: tắt bơm vẫn còn bấy nhiêu
+    const w = lathe([[0, 0], [rIn, 0], [rIn, S.keep], [0, S.keep], [0, 0]],
+                    C.water, 0.34, 40);
+    w.position.set(p.x, p.y, p.floorZ + P.POT_FLOOR);
+    model.add(w);
+
+    // ngưỡng khe tràn, vẽ bằng một vòng nhỏ để thấy cao độ
+    const sill = new THREE.Mesh(
+      new THREE.TorusGeometry(rIn, 0.7, 6, 40), mat(C.seat));
+    sill.position.set(p.x, p.y, p.floorZ + P.POT_FLOOR + S.keep);
+    model.add(sill);
+  }
+
+  report(d);
+}
+
+// ═════════════════════════════════════════════════ phán quyết + bảng kiểm
+function report(d) {
+  const m = S.lift, vEl = document.getElementById("verdict");
+  const pct = (d.submergeRatio * 100).toFixed(0);
+  let cls, text;
+
+  if (S.pump) {
+    const ok = PUMP_HEAD_MM >= d.liftNeeded;
+    cls = ok ? "ok" : "bad";
+    text = ok
+      ? `A 5 V submersible pump has ${PUMP_HEAD_MM / 10} cm of head against the `
+        + `${d.liftNeeded.toFixed(0)} mm needed, and it does not care how deep it sits. `
+        + `This is the way to run a tray at the rim - the air-stone route cannot reach.`
+      : `Even a 5 V pump falls short of ${d.liftNeeded.toFixed(0)} mm.`;
+  } else if (d.reachable === 0) {
+    cls = "bad";
+    text = `Every pot sits above ${d.maxDischargeZ.toFixed(0)} mm, the highest an uplift `
+         + `tube can discharge from a ${S.water} mm reservoir. Lower the tilt or fit a 5 V pump.`;
+  } else if (d.reachable < P.N_POTS) {
+    cls = "warn";
+    text = `${d.reachable} of ${P.N_POTS} pots are within airlift reach `
+         + `(ceiling ${d.maxDischargeZ.toFixed(0)} mm). The rest need the tilt reduced, or a `
+         + `5 V submersible pump, which does not care about submergence.`;
+  } else if (m === 0) {
+    cls = "warn";
+    text = `Geometry works: all six pots are under the ${d.maxDischargeZ.toFixed(0)} mm `
+         + `ceiling and the tube would be ${pct} % submerged. `
+         + `${d.liftNeeded.toFixed(0)} mm of lift is needed - still unmeasured.`;
+  } else if (m >= d.liftNeeded) {
+    cls = "ok";
+    text = `${m} mm measured, ${d.liftNeeded.toFixed(0)} mm needed, tube ${pct} % submerged. `
+         + `Feasible as drawn.`;
+  } else {
+    cls = "bad";
+    text = `${m} mm measured but ${d.liftNeeded.toFixed(0)} mm needed to reach the top pot. `
+         + `Lower the tilt, or fit a 5 V submersible pump.`;
+  }
+  vEl.className = "verdict " + cls;
+  vEl.textContent = text;
+
+  const seatSpread = d.topPot.seatZ - d.lowPot.seatZ;
+  const rows = [
+    ["Water stays in every pot with the pump off",
+     `${S.keep} mm standing depth; roots are 10-20 mm, so the sill has to clear them`,
+     S.keep >= 12 ? "ok" : S.keep >= 8 ? "warn" : "bad"],
+
+    ["Pots are level, tray is not",
+     `tray leans ${d.tiltDeg.toFixed(1)}&deg;, pot floors all horizontal, seats spread over `
+     + `${seatSpread.toFixed(0)} mm of height`,
+     "ok"],
+
+    ["The tilt drives the cascade",
+     d.minStep >= 3
+       ? `${d.minStep.toFixed(1)} mm drop between neighbouring pots - water runs downhill `
+         + `pot to pot and off the low edge`
+       : `only ${d.minStep.toFixed(1)} mm between neighbours; below ~3 mm the water will not `
+         + `flow reliably and each pot needs its own feed`,
+     d.minStep >= 3 ? "ok" : "bad"],
+
+    ["Tray matches the rim angle",
+     d.tiltDeg > GLASS.TILT_DEG - 1.5
+       ? `${d.tiltDeg.toFixed(1)}&deg; against the rim's ${GLASS.TILT_DEG}&deg; - seats on the glass`
+       : `${d.tiltDeg.toFixed(1)}&deg; against the rim's ${GLASS.TILT_DEG}&deg; - will not seat, `
+         + `needs the mesh base to carry it`,
+     d.tiltDeg > GLASS.TILT_DEG - 1.5 ? "ok" : "warn"],
+
+    ["Tray bears on the rim all round",
+     `&#216;${d.trayPlanSpan.toFixed(0)} tray on a &#216;90 mouth - ${d.bearing.toFixed(1)} mm `
+     + `of bearing per side`,
+     d.bearing >= 5 ? "ok" : d.bearing > 0 ? "warn" : "bad"],
+
+    ["Six pots fit round the ring",
+     `${d.pitch.toFixed(1)} mm centre to centre, needs >= `
+     + `${(2 * d.potOuterR + 3).toFixed(1)} mm`,
+     d.pitch >= 2 * d.potOuterR + 3 ? "ok" : "bad"],
+
+    ["Pot bore takes a root ball",
+     `&#216;${S.pot}; V1 proved 26 mm is the floor - it was sized for single roots and failed`,
+     S.pot >= 26 ? "ok" : "bad"],
+
+    ["Seat holes are elliptical, not round",
+     `${(2 * d.seatR / Math.cos(d.tiltDeg * Math.PI / 180)).toFixed(1)} x `
+     + `${(2 * d.seatR).toFixed(1)} mm - an upright pot cuts an ellipse through a leaning tray`,
+     "ok"],
+
+    ["Pots lift out for cleaning",
+     `${P.CLEARANCE} mm slip fit per side, ${P.POT_FLANGE} mm flange resting on the seat lip`,
+     "ok"],
+
+    ["Feed reaches the top pot",
+     S.pump
+       ? `5 V pump, ${PUMP_HEAD_MM / 10} cm of head against ${d.liftNeeded.toFixed(0)} mm needed`
+       : `${d.reachable} of ${P.N_POTS} pots under the ${d.maxDischargeZ.toFixed(0)} mm `
+         + `airlift ceiling; top pot's water sits at ${d.topPot.waterZ.toFixed(0)} mm`,
+     S.pump ? (PUMP_HEAD_MM >= d.liftNeeded ? "ok" : "bad")
+            : (d.reachable === P.N_POTS ? "ok" : d.reachable > 0 ? "warn" : "bad")],
+
+    ["Uplift tube stays 70 % submerged",
+     S.pump ? `not applicable - a pump does not depend on submergence`
+            : `${pct} % with the discharge at ${d.dischargeZ.toFixed(0)} mm`,
+     S.pump ? "ok" : (d.submergeRatio >= P.SUBMERGE_MIN ? "ok" : "bad")],
+
+    [S.pump ? "Pump sits in the reservoir" : "Air barb stays under water",
+     S.pump ? `pump body on the glass bottom, cable out over the rim; nothing mains-powered `
+            + `touches the water`
+            : `barb at ${P.BARB_Z} mm, surface at ${S.water} mm`,
+     S.pump ? "ok" : (P.BARB_Z < S.water - 5 ? "ok" : "bad")],
+
+    ["Everything prints without support",
+     `tray flat in its own plane, seats are countersinks opening upward; pots upright on `
+     + `their own floors`,
+     "ok"],
+
+    ["Tray fits the print bed",
+     `&#216;${d.printSpan.toFixed(0)} against ${P.BED} mm usable`,
+     d.printSpan <= P.BED ? "ok" : "bad"],
+  ];
+
+  document.getElementById("checks").innerHTML = rows.map(([n, det, st]) =>
+    `<li><span class="mark m-${st}">${st === "ok" ? "✓" : st === "warn" ? "!" : "✗"}</span>` +
+    `<span><b>${n}</b><br><span style="color:var(--sub)">${det}</span></span></li>`).join("");
+}
+
+// ═════════════════════════════════════════════════ giao diện
+function slider(id, key, fmt) {
+  const el = document.getElementById("s-" + id), out = document.getElementById("v-" + id);
+  const sync = () => { S[key] = Number(el.value); out.textContent = fmt(S[key]); rebuild(); };
+  el.addEventListener("input", sync); sync();
+}
+slider("tilt",  "tilt",  v => (v / 10).toFixed(1) + "°");
+slider("tray",  "tray",  v => "Ø" + v);
+slider("pot",   "pot",   v => "Ø" + v);
+slider("keep",  "keep",  v => v + " mm");
+slider("water", "water", v => v + " mm");
+slider("lift",  "lift",  v => v === 0 ? "not measured" : v + " mm");
+
+function toggle(id, key, on, off) {
+  document.getElementById(id).onclick = e => {
+    S[key] = !S[key];
+    e.currentTarget.textContent = S[key] ? on : off;
+    e.currentTarget.setAttribute("aria-pressed", String(S[key]));
+    rebuild();
+  };
+}
+toggle("b-glass", "glass",    "glass + water", "glass hidden");
+toggle("b-tray",  "tray_on",  "tray", "tray hidden");
+
+function setPump(v) {
+  S.pump = v;
+  document.getElementById("b-air").setAttribute("aria-pressed", String(!v));
+  document.getElementById("b-pump").setAttribute("aria-pressed", String(v));
+  rebuild();
+}
+document.getElementById("b-air").onclick  = () => setPump(false);
+document.getElementById("b-pump").onclick = () => setPump(true);
+
+const cam = { theta: -Math.PI / 2.4, phi: 1.18, dist: 360,
+              target: new THREE.Vector3(0, 0, 76) };
+function setView(v) {
+  S.view = v;
+  document.getElementById("b-whole").setAttribute("aria-pressed", String(v === "whole"));
+  document.getElementById("b-cut").setAttribute("aria-pressed", String(v === "cut"));
+  const d = derive();
+  if (v === "cut") {
+    S.glass = false;
+    document.getElementById("b-glass").setAttribute("aria-pressed", "false");
+    document.getElementById("b-glass").textContent = "glass hidden";
+    cam.target.set(d.topPot.x * 0.7, 0, d.topPot.seatZ - 4);
+    cam.dist = 150; cam.theta = -0.5; cam.phi = 1.42;
+  } else {
+    cam.target.set(0, 0, 76); cam.dist = 360;
+    cam.theta = -Math.PI / 2.4; cam.phi = 1.18;
+  }
+  rebuild();
+}
+document.getElementById("b-whole").onclick = () => setView("whole");
+document.getElementById("b-cut").onclick   = () => setView("cut");
+
+function applyCamera() {
+  const sp = Math.sin(cam.phi), cp = Math.cos(cam.phi);
+  camera.position.set(cam.target.x + cam.dist * sp * Math.cos(cam.theta),
+                      cam.target.y + cam.dist * sp * Math.sin(cam.theta),
+                      cam.target.z + cam.dist * cp);
+  camera.lookAt(cam.target);
+}
+let drag = null;
+stage.addEventListener("pointerdown", ev => {
+  drag = { x: ev.clientX, y: ev.clientY, pan: ev.shiftKey || ev.button === 2 };
+  stage.setPointerCapture(ev.pointerId); stage.classList.add("grabbing");
+});
+stage.addEventListener("pointermove", ev => {
+  if (!drag) return;
+  const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+  drag.x = ev.clientX; drag.y = ev.clientY;
+  if (drag.pan) {
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+    const up    = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+    const k = cam.dist * 0.0016;
+    cam.target.addScaledVector(right, -dx * k).addScaledVector(up, dy * k);
+  } else {
+    cam.theta -= dx * 0.008;
+    cam.phi = Math.min(Math.PI - 0.05, Math.max(0.05, cam.phi - dy * 0.008));
+  }
+});
+["pointerup", "pointercancel"].forEach(e => stage.addEventListener(e, ev => {
+  drag = null; stage.classList.remove("grabbing");
+  if (stage.hasPointerCapture?.(ev.pointerId)) stage.releasePointerCapture(ev.pointerId);
+}));
+stage.addEventListener("contextmenu", ev => ev.preventDefault());
+stage.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  cam.dist = Math.min(1800, Math.max(60, cam.dist * Math.exp(ev.deltaY * 0.001)));
+}, { passive: false });
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+resize();
+rebuild();
+
+(function loop() {
+  requestAnimationFrame(loop);
+  applyCamera();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
