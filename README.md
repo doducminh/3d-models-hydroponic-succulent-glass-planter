@@ -17,6 +17,12 @@ STL files, not a simplified stand-in.
 To publish it on the web, enable GitHub Pages (Settings → Pages → Source: main,
 folder `/`) and it becomes browsable at `/viewer/`.
 
+[`viewer/v2-tower.html`](viewer/v2-tower.html) is a separate, **speculative** page: a
+parametric study of a two-tier version that would hold six plants instead of four,
+with the water lifted by an aquarium air stone. Nothing on that page is printable —
+it exists to test whether the idea survives contact with the numbers before any CAD
+is drawn. Move its top slider and it tells you.
+
 ## Parts
 
 | File | Size | Weight (PETG, solid) | Print orientation |

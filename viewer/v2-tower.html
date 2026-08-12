@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<!--
+  V2 two-tier airlift tower — parametric design study.
+
+  Nothing here is printable yet. The geometry is built in JavaScript from the
+  parameters in v2-two-tier-spec.md, so the numbers can be changed and judged
+  before any CAD exists. Self-contained: no local files, no web server needed.
+
+  The single number that decides whether this design is possible at all is the
+  measured airlift rise. Everything else is downstream of it.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two-Tier Airlift Tower — design study</title>
+<style>
+  :root{--bg:#FAF6F2;--ink:#2A2320;--sub:#6B5F58;--line:#E4D9D1;--accent:#C08A8E;--teal:#5C7F72;}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Avenir Next','Segoe UI',system-ui,sans-serif}
+  header{padding:16px 18px 10px}
+  h1{margin:0;font-size:16px;font-weight:600}
+  header p{margin:6px 0 0;font-size:12px;color:var(--sub);line-height:1.55;max-width:760px}
+  #stage{position:relative;width:100%;height:56vh;min-height:340px;touch-action:none;cursor:grab}
+  #stage.grabbing{cursor:grabbing}
+  canvas{display:block}
+  #err{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    padding:24px;text-align:center;font-size:13.5px;color:var(--sub)}
+  #err.on{display:flex}
+  .panel{padding:12px 18px 26px;display:grid;gap:18px;
+    grid-template-columns:repeat(auto-fit,minmax(300px,1fr));max-width:1180px}
+  .card h2{margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--sub)}
+  .row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  label{font-size:12px;color:var(--sub);min-width:118px}
+  input[type=range]{flex:1;min-width:110px;accent-color:var(--accent)}
+  .val{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;min-width:56px;
+    text-align:right}
+  button{font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);border-radius:20px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--accent)}
+  button[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+  .verdict{padding:11px 14px;border-radius:10px;font-size:13px;line-height:1.55;
+    margin-bottom:12px}
+  .ok{background:#DFEADF;color:#33513C}
+  .warn{background:#F6E5D6;color:#7C4F22}
+  .bad{background:#F5DADA;color:#7E3232}
+  ul.checks{list-style:none;margin:0;padding:0;font-size:12.5px;line-height:1.6}
+  ul.checks li{padding:5px 0;border-bottom:1px solid var(--line);display:flex;gap:9px}
+  ul.checks li:last-child{border-bottom:0}
+  .mark{flex:0 0 15px;font-weight:700}
+  .m-ok{color:var(--teal)} .m-warn{color:#B07A3C} .m-bad{color:#B04A4A}
+  .note{font-size:11.5px;color:var(--sub);line-height:1.65;max-width:760px;
+    padding:0 18px 26px}
+  .note b{color:var(--accent)}
+  code{background:#F0E8E2;padding:1px 5px;border-radius:4px;font-size:11px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Two-Tier Airlift Tower — design study</h1>
+  <p>Six hydroponic succulents on two levels, water lifted from one shared reservoir by
+     an aquarium air stone. <b>No printable files exist yet.</b> Move the top slider to the
+     value you measure in the glass and the model tells you whether this design can work
+     at all. Drag to rotate, scroll to zoom, hold Shift to pan.</p>
+</header>
+
+<div id="stage"><div id="err"></div></div>
+
+<div class="panel">
+
+  <div class="card">
+    <h2>The number that decides everything</h2>
+    <div class="row">
+      <label>Measured airlift rise</label>
+      <input type="range" id="s-lift" min="0" max="90" step="1" value="0">
+      <span class="val" id="v-lift">not measured</span>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <h2>Geometry</h2>
+    <div class="row">
+      <label>Tier 1 diameter</label>
+      <button id="b-84" aria-pressed="false">&#216;84</button>
+      <button id="b-110" aria-pressed="true">&#216;110</button>
+    </div>
+    <div class="row">
+      <label>Tier gap</label>
+      <input type="range" id="s-rise" min="20" max="70" step="1" value="40">
+      <span class="val" id="v-rise"></span>
+    </div>
+    <div class="row">
+      <label>Planting hole &#216;</label>
+      <input type="range" id="s-cup" min="24" max="36" step="1" value="30">
+      <span class="val" id="v-cup"></span>
+    </div>
+    <div class="row">
+      <label>Outer rim</label>
+      <input type="range" id="s-rim" min="0" max="30" step="1" value="0">
+      <span class="val" id="v-rim"></span>
+    </div>
+    <div class="row">
+      <label>Reservoir level</label>
+      <input type="range" id="s-water" min="50" max="76" step="1" value="74">
+      <span class="val" id="v-water"></span>
+    </div>
+    <div class="row">
+      <label>Show glass</label>
+      <button id="b-glass" aria-pressed="true">glass + water</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Checks</h2>
+    <ul class="checks" id="checks"></ul>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Where the numbers come from.</b> Every default is from
+  <code>v2-two-tier-spec.md</code>: column &#216;28, tier 1 at z=84, trough 16 mm deep with
+  3 mm walls, 10 mm of water in the trough, tier 2 at 0.65&times; the tier 1 diameter,
+  4 plants below and 2 above. The mesh base is the V1 part, reused unchanged.
+  <br><br>
+  <b>Why the airlift rise is a hard ceiling.</b> An air-stone lift raises water by roughly
+  10&ndash;20&nbsp;% of how deep the tube is submerged &mdash; not by how powerful the pump is.
+  The glass only holds ~74 mm of water, so a 1 W pump and a 5 W pump reach the same
+  height; the bigger one just bubbles harder. Measure it before anything is designed:
+  a clear &#216;6&ndash;8 mm tube with the air stone at its foot, standing in the filled glass,
+  and read how far above the water the flow comes out.
+  <br><br>
+  <b>The glass profile is interpolated, not measured.</b> Inner mouth &#216;90 and 80 mm from
+  the base to the low side of the slanted rim are real measurements; the bulge of the
+  body and the curve of the base are guesses from a photograph.
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═════════════════════════════════════════════════ tham số cố định (v2-two-tier-spec.md)
+const P = {
+  COL_OUTER_R: 14, COL_INNER_R: 11, TUBE_ID: 7,
+  BASE_TOP_Z: 67,                 // đỉnh đế lưới V1, tái dùng nguyên
+  T1_Z: 84,                       // cao độ mặt dưới đĩa tầng 1
+  TROUGH_DEPTH: 16, TROUGH_WALL: 3, WATER_IN_TROUGH: 10,
+  CUP_WALL: 2.5, CUP_DEPTH: 18,
+  T2_RATIO: 0.65,                 // T2_DIA = 0.65 x T1_DIA
+  SPOUT_ABOVE_WATER: 12,          // miệng vòi cao hơn mực nước máng tầng 2
+  T1_PLANTS: 4, T2_PLANTS: 2,
+  GLASS_MOUTH_R: 45, GLASS_RIM_LOW_Z: 80, GLASS_RIM_HIGH_Z: 115,
+  RETURN_HOLES: 4, RETURN_HOLE_D: 5,
+  MOUTH_CLEAR_D: 84,              // cột + đế phải chui lọt miệng ly O90
+};
+
+const S = { lift: 0, t1dia: 110, rise: 40, cup: 30, rim: 0, water: 74, glass: true };
+
+const stage = document.getElementById("stage");
+const errEl = document.getElementById("err");
+if (typeof THREE === "undefined") {
+  errEl.textContent = "Could not load the three.js library - check your connection and reload.";
+  errEl.classList.add("on");
+  throw new Error("three.js not loaded");
+}
+
+// ═════════════════════════════════════════════════ cảnh
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xFAF6F2);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 20000);
+camera.up.set(0, 0, 1);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+stage.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f78, 0.95));
+const key = new THREE.DirectionalLight(0xffffff, 0.55);
+key.position.set(1, -1.4, 2);
+scene.add(key);
+
+const grid = new THREE.GridHelper(200, 20, 0xD8CCC4, 0xEBE2DB);
+grid.rotation.x = Math.PI / 2;
+scene.add(grid);
+
+const model = new THREE.Group();
+scene.add(model);
+
+// LatheGeometry quay quanh trục Y; cả dự án dùng trục Z hướng lên nên xoay lại.
+function lathe(pts, color, opts = {}) {
+  const geo = new THREE.LatheGeometry(
+    pts.map(([r, h]) => new THREE.Vector2(Math.max(r, 1e-4), h)), opts.seg || 96);
+  geo.rotateX(Math.PI / 2);
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+    color, side: THREE.DoubleSide,
+    transparent: opts.opacity !== undefined,
+    opacity: opts.opacity ?? 1, depthWrite: opts.opacity === undefined,
+  }));
+}
+
+function tube(r, z0, z1, color, opacity) {
+  const g = new THREE.CylinderGeometry(r, r, z1 - z0, 48, 1, true);
+  g.rotateX(Math.PI / 2);
+  g.translate(0, 0, (z0 + z1) / 2);
+  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({
+    color, side: THREE.DoubleSide,
+    transparent: opacity !== undefined, opacity: opacity ?? 1,
+    depthWrite: opacity === undefined,
+  }));
+}
+
+// ═════════════════════════════════════════════════ dựng lại mô hình khi đổi tham số
+function derive() {
+  const W = P.TROUGH_WALL, D = P.TROUGH_DEPTH;
+  const t2dia = S.t1dia * P.T2_RATIO;
+  const t2z   = P.T1_Z + S.rise;
+
+  const tier = (dia) => {
+    const rOut = dia / 2 - S.rim;              // mép ngoài BỜ máng
+    const rIn  = P.COL_OUTER_R + 3;            // mép trong bờ máng, sát cột
+    return {
+      dia, rOut, rIn,
+      floorR0: rIn + W, floorR1: rOut - W,     // lòng máng
+      ring: (rIn + W + rOut - W) / 2,          // vòng đặt hốc trồng
+    };
+  };
+  const t1 = tier(S.t1dia), t2 = tier(t2dia);
+
+  const cupOuterR = S.cup / 2 + P.CUP_WALL;
+  // Mực nước máng tầng 2 -> miệng vòi -> đó mới là độ cao airlift phải nâng tới.
+  const troughWaterZ2 = t2z + W + P.WATER_IN_TROUGH;
+  const spoutZ = troughWaterZ2 + P.SPOUT_ABOVE_WATER;
+
+  return {
+    W, D, t1, t2, t2dia, t2z, cupOuterR, spoutZ,
+    troughWater1: P.T1_Z + W + P.WATER_IN_TROUGH,
+    liftToSpout: spoutZ - S.water,
+    liftToTier2: t2z - S.water,
+    liftToTier1: P.T1_Z + W + P.WATER_IN_TROUGH - S.water,
+    cupPitch1: 2 * t1.ring * Math.sin(Math.PI / P.T1_PLANTS),
+    cupPitch2: 2 * t2.ring * Math.sin(Math.PI / P.T2_PLANTS),
+    freeRim: (S.t1dia / 2) - (t1.ring + cupOuterR),
+  };
+}
+
+function troughProfile(t, W, D) {
+  // Mặt cắt máng vành khuyên, gốc ở mặt dưới đĩa. Lỗ giữa cho ống airlift đi qua
+  // (đặc tả vẽ moay-ơ đặc từ tâm — chắc là sót, vì ống phải xuyên lên tầng 2).
+  const { rIn, rOut } = t;
+  return [
+    [P.COL_INNER_R, 0], [rOut, 0], [rOut, W + D], [rOut - W, W + D],
+    [rOut - W, W], [rIn + W, W], [rIn + W, W + D], [rIn, W + D],
+    [rIn, W], [P.COL_INNER_R, W], [P.COL_INNER_R, 0],
+  ];
+}
+
+function cupMesh(cupOuterR, z) {
+  const m = lathe([
+    [0, 0], [cupOuterR, 0], [cupOuterR, P.CUP_DEPTH],
+    [S.cup / 2, P.CUP_DEPTH], [S.cup / 2, 2], [0, 2], [0, 0],
+  ], 0xB4737A, { seg: 48 });
+  m.position.z = z;
+  return m;
+}
+
+function rebuild() {
+  const d = derive();
+  while (model.children.length) model.remove(model.children[0]);
+
+  // ── ly thuỷ tinh + nước (biên dạng thân là NỘI SUY, không phải số đo)
+  if (S.glass) {
+    model.add(lathe([
+      [0, 0], [40, 0], [44, 14], [46.5, 40], [45.5, 62], [P.GLASS_MOUTH_R, P.GLASS_RIM_LOW_Z],
+      [P.GLASS_MOUTH_R + 3, P.GLASS_RIM_LOW_Z], [48.5, 62], [49.5, 40], [47, 14], [43, 0], [0, 0],
+    ], 0x9FB8C4, { opacity: 0.18 }));
+    model.add(lathe([[0, 0], [43.5, 0], [44.6, 30], [44.2, S.water], [0, S.water], [0, 0]],
+                    0x6FA8C0, { opacity: 0.24 }));
+  }
+
+  // ── đế lưới V1, tái dùng nguyên (biên dạng lấy từ generate_v1_single_tier.py)
+  model.add(lathe([[27, 0], [30, 0], [38, 62], [45.6, 67], [43, 67], [35, 62], [27, 0]],
+                  0x5C7F72, { seg: 96 }));
+
+  // ── cột dưới và cột trên
+  model.add(tube(P.COL_OUTER_R, P.BASE_TOP_Z, P.T1_Z, 0x5C7F72));
+  model.add(tube(P.COL_OUTER_R, P.T1_Z + d.W, d.t2z, 0x5C7F72));
+
+  // ── ống airlift trong lòng cột, chạy từ đá sủi lên miệng vòi
+  model.add(tube(P.TUBE_ID / 2, 6, d.spoutZ, 0x7FA8BD, 0.65));
+  const stone = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 16, 32),
+    new THREE.MeshLambertMaterial({ color: 0x8C8C8C }));
+  stone.geometry.rotateX(Math.PI / 2);
+  stone.position.z = 8;
+  model.add(stone);
+
+  // ── hai đĩa máng + hốc trồng
+  for (const [t, z, n, phase] of [[d.t1, P.T1_Z, P.T1_PLANTS, 0],
+                                  [d.t2, d.t2z, P.T2_PLANTS, Math.PI / 4]]) {
+    const disc = lathe(troughProfile(t, d.W, d.D), 0x8FAF9F);
+    disc.position.z = z;
+    model.add(disc);
+
+    // nước trong máng
+    const wr = lathe([[t.floorR0, 0], [t.floorR1, 0],
+                      [t.floorR1, P.WATER_IN_TROUGH], [t.floorR0, P.WATER_IN_TROUGH],
+                      [t.floorR0, 0]], 0x6FA8C0, { opacity: 0.35 });
+    wr.position.z = z + d.W;
+    model.add(wr);
+
+    for (let i = 0; i < n; i++) {
+      const a = phase + i * 2 * Math.PI / n;
+      const cup = cupMesh(d.cupOuterR, z + d.W);
+      cup.position.x = t.ring * Math.cos(a);
+      cup.position.y = t.ring * Math.sin(a);
+      model.add(cup);
+    }
+  }
+
+  // ── vòi ra tầng 2: khuỷu nằm ngang, đổ nước xuống lòng máng tầng 2
+  const arm = new THREE.Mesh(
+    new THREE.CylinderGeometry(P.TUBE_ID / 2, P.TUBE_ID / 2, d.t2.ring, 24),
+    new THREE.MeshLambertMaterial({ color: 0x7FA8BD }));
+  arm.geometry.rotateZ(Math.PI / 2);                       // trục ống nằm theo X
+  arm.geometry.translate(d.t2.ring / 2, 0, 0);
+  arm.position.z = d.spoutZ;
+  model.add(arm);
+
+  // miệng vòi loe, chúc xuống để nước tãi ra chứ không bắn tia
+  const lip = new THREE.Mesh(
+    new THREE.CylinderGeometry(P.TUBE_ID / 2, P.TUBE_ID / 2 + 2.5, 7, 24, 1, true),
+    new THREE.MeshLambertMaterial({ color: 0x7FA8BD, side: THREE.DoubleSide }));
+  lip.geometry.translate(0, -3.5, 0);
+  lip.position.set(d.t2.ring, 0, d.spoutZ);
+  model.add(lip);
+
+  report(d);
+}
+
+// ═════════════════════════════════════════════════ phán quyết + bảng kiểm
+function report(d) {
+  const measured = S.lift;
+  const vEl = document.getElementById("verdict");
+
+  let cls, text;
+  if (measured === 0) {
+    cls = "warn";
+    text = "Not measured yet. Until this number exists the design cannot be built - "
+         + "a wrong guess here wastes hours of CAD and a whole print run. "
+         + "The test takes five minutes.";
+  } else if (measured >= d.liftToSpout) {
+    cls = "ok";
+    text = `${measured} mm measured, ${d.liftToSpout.toFixed(0)} mm needed to reach the `
+         + `tier 2 spout. Design is feasible as drawn.`;
+  } else if (measured >= d.liftToTier1) {
+    cls = "warn";
+    text = `${measured} mm measured, but ${d.liftToSpout.toFixed(0)} mm is needed to reach `
+         + `the tier 2 spout. Tier 1 alone needs ${d.liftToTier1.toFixed(0)} mm and would `
+         + `work. Either drop to a single tier, or lower tier 1 and close the gap.`;
+  } else {
+    cls = "bad";
+    text = `${measured} mm measured, ${d.liftToTier1.toFixed(0)} mm needed just to fill `
+         + `tier 1. An air stone cannot drive this tower. Options: stay with V1, wait for `
+         + `the roots to grow and use one shared reservoir, or fit a 5 V submersible pump.`;
+  }
+  vEl.className = "verdict " + cls;
+  vEl.textContent = text;
+
+  const checks = [
+    ["Lift to tier 2 spout",
+     `${d.liftToSpout.toFixed(0)} mm needed`,
+     measured === 0 ? "warn" : (measured >= d.liftToSpout ? "ok" : "bad")],
+
+    ["Lift to fill tier 1",
+     `${d.liftToTier1.toFixed(0)} mm needed`,
+     measured === 0 ? "warn" : (measured >= d.liftToTier1 ? "ok" : "bad")],
+
+    ["Cup fits inside trough",
+     `cup reaches r=${(d.t1.ring + d.cupOuterR).toFixed(1)}, trough wall at ` +
+     `r=${(d.t1.rOut - d.W).toFixed(1)}`,
+     d.t1.ring + d.cupOuterR <= d.t1.rOut - d.W ? "ok" : "bad"],
+
+    ["Cup spacing, tier 1",
+     `${d.cupPitch1.toFixed(1)} mm centre to centre, needs >= ${(S.cup + 8)} mm`,
+     d.cupPitch1 >= S.cup + 8 ? "ok" : "bad"],
+
+    ["Planting hole takes a root ball",
+     `${S.cup} mm, V1 proved 26 mm is the floor`,
+     S.cup >= 26 ? "ok" : "bad"],
+
+    ["Room left for decorative holes",
+     d.freeRim > 0 ? `${d.freeRim.toFixed(1)} mm of free rim`
+                   : `none - cups reach the disc edge`,
+     d.freeRim >= 12 ? "ok" : (d.freeRim > 0 ? "warn" : "bad")],
+
+    ["Column passes the glass mouth",
+     `&#216;${(P.COL_OUTER_R * 2)} column vs &#216;90 mouth. The base is the V1 part, ` +
+     `already proven to go in.`,
+     P.COL_OUTER_R * 2 < P.MOUTH_CLEAR_D ? "ok" : "bad"],
+
+    ["Return holes outflow the airlift tube",
+     `${P.RETURN_HOLES}x&#216;${P.RETURN_HOLE_D} = ` +
+     `${(P.RETURN_HOLES * Math.PI * (P.RETURN_HOLE_D / 2) ** 2).toFixed(0)} mm&sup2; vs tube ` +
+     `${(Math.PI * (P.TUBE_ID / 2) ** 2).toFixed(0)} mm&sup2;, needs 2x`,
+     P.RETURN_HOLES * (P.RETURN_HOLE_D / 2) ** 2 >= 2 * (P.TUBE_ID / 2) ** 2 ? "ok" : "warn"],
+
+    ["Tipping margin",
+     S.t1dia > 90 ? `&#216;${S.t1dia} disc overhangs the glass - knocks it over more easily`
+                  : `&#216;${S.t1dia} disc stays inside the glass footprint`,
+     S.t1dia > 90 ? "warn" : "ok"],
+  ];
+
+  document.getElementById("checks").innerHTML = checks.map(([name, detail, st]) =>
+    `<li><span class="mark m-${st}">${st === "ok" ? "✓" : st === "warn" ? "!" : "✗"}</span>` +
+    `<span><b>${name}</b><br><span style="color:var(--sub)">${detail}</span></span></li>`).join("");
+}
+
+// ═════════════════════════════════════════════════ điều khiển giao diện
+function bindSlider(id, key, fmt) {
+  const el = document.getElementById("s-" + id), out = document.getElementById("v-" + id);
+  const sync = () => {
+    S[key] = Number(el.value);
+    out.textContent = fmt(S[key]);
+    rebuild();
+  };
+  el.addEventListener("input", sync);
+  sync();
+}
+
+bindSlider("rise",  "rise",  v => v + " mm");
+bindSlider("cup",   "cup",   v => "Ø" + v);
+bindSlider("rim",   "rim",   v => v + " mm");
+bindSlider("water", "water", v => v + " mm");
+bindSlider("lift",  "lift",  v => v === 0 ? "not measured" : v + " mm");
+
+function setDia(d) {
+  S.t1dia = d;
+  document.getElementById("b-84").setAttribute("aria-pressed", String(d === 84));
+  document.getElementById("b-110").setAttribute("aria-pressed", String(d === 110));
+  rebuild();
+}
+document.getElementById("b-84").onclick = () => setDia(84);
+document.getElementById("b-110").onclick = () => setDia(110);
+document.getElementById("b-glass").onclick = e => {
+  S.glass = !S.glass;
+  e.currentTarget.setAttribute("aria-pressed", String(S.glass));
+  rebuild();
+};
+
+// ═════════════════════════════════════════════════ xoay / phóng / dời
+const cam = { theta: -Math.PI / 2.3, phi: 1.25, dist: 330,
+              target: new THREE.Vector3(0, 0, 80) };
+function applyCamera() {
+  const sp = Math.sin(cam.phi), cp = Math.cos(cam.phi);
+  camera.position.set(cam.target.x + cam.dist * sp * Math.cos(cam.theta),
+                      cam.target.y + cam.dist * sp * Math.sin(cam.theta),
+                      cam.target.z + cam.dist * cp);
+  camera.lookAt(cam.target);
+}
+let drag = null;
+stage.addEventListener("pointerdown", ev => {
+  drag = { x: ev.clientX, y: ev.clientY, pan: ev.shiftKey || ev.button === 2 };
+  stage.setPointerCapture(ev.pointerId);
+  stage.classList.add("grabbing");
+});
+stage.addEventListener("pointermove", ev => {
+  if (!drag) return;
+  const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+  drag.x = ev.clientX; drag.y = ev.clientY;
+  if (drag.pan) {
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+    const up    = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+    const k = cam.dist * 0.0016;
+    cam.target.addScaledVector(right, -dx * k).addScaledVector(up, dy * k);
+  } else {
+    cam.theta -= dx * 0.008;
+    cam.phi = Math.min(Math.PI - 0.05, Math.max(0.05, cam.phi - dy * 0.008));
+  }
+});
+["pointerup", "pointercancel"].forEach(e => stage.addEventListener(e, ev => {
+  drag = null;
+  stage.classList.remove("grabbing");
+  if (stage.hasPointerCapture?.(ev.pointerId)) stage.releasePointerCapture(ev.pointerId);
+}));
+stage.addEventListener("contextmenu", ev => ev.preventDefault());
+stage.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  cam.dist = Math.min(1600, Math.max(60, cam.dist * Math.exp(ev.deltaY * 0.001)));
+}, { passive: false });
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+resize();
+setDia(110);
+
+(function loop() {
+  requestAnimationFrame(loop);
+  applyCamera();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
