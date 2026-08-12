@@ -107,7 +107,7 @@
     </div>
     <div class="row">
       <label>Well spacing</label>
-      <input type="range" id="s-ring" min="24" max="46" step="1" value="32">
+      <input type="range" id="s-ring" min="24" max="46" step="1" value="30">
       <span class="val" id="v-ring"></span>
     </div>
     <div class="row">
@@ -206,7 +206,7 @@ const P = {
 };
 
 const S = { gtilt: 213, tilt: 213, tray: 112, water: 74,
-            bore: 28, ring: 32, recess: 40, keep: 14,
+            bore: 28, ring: 30, recess: 40, keep: 14,
             gap: 8, pump: false, glass: true, trellis: true, view: "whole" };
 
 const stage = document.getElementById("stage");
@@ -307,14 +307,91 @@ function slantedRing(rIn, rOut, zBase, zAt, seg = 96) {
   return g;
 }
 
+// ═════════════════════════════════════════════════ dựng chậu bằng lưới liền
+// Lấy mẫu theo góc, mỗi cung một cao độ sàn. Ranh giới cung lấy mẫu HAI LẦN
+// (cùng góc, hai cao độ) để sinh ra vách bậc thẳng đứng.
+function basinRings(d) {
+  const out = [], per = 30;
+  for (let k = 0; k < P.N; k++) {
+    const a0 = (k - 0.5) * 2 * Math.PI / P.N, a1 = (k + 0.5) * 2 * Math.PI / P.N;
+    for (let j = 0; j <= per; j++) {
+      const th = a0 + (a1 - a0) * j / per;
+      out.push({ th, fz: d.wells[k].floorZ });
+    }
+  }
+  out.push({ th: out[0].th + 2 * Math.PI, fz: out[0].fz });
+  return out;
+}
+// bán kính đường bao lòng chậu theo góc (hợp 6 hình tròn + đĩa giữa), trong MẶT BẰNG
+function basinR(d, th) {
+  let r = d.centreR;
+  for (let k = 0; k < P.N; k++) {
+    const dp = th - 2 * Math.PI * k / P.N;
+    const s = d.ringR * Math.sin(dp);
+    if (Math.abs(s) <= d.boreR)
+      r = Math.max(r, d.ringR * Math.cos(dp) + Math.sqrt(d.boreR * d.boreR - s * s));
+  }
+  return r;
+}
+// mép ngoài mâm: đĩa bán kính trayR nằm trong mặt phẳng nghiêng -> mặt bằng là elip
+function trayEdgeR(d, th) {
+  const a = d.trayR * Math.cos(d.tTilt * Math.PI / 180), b = d.trayR;
+  return a * b / Math.hypot(b * Math.cos(th), a * Math.sin(th));
+}
+const surfZ = (d, x) => d.trayZ0 + x * d.t;      // cao độ mặt mâm nghiêng tại x
+
+function stripGeometry(rows, color, opacity) {
+  const pos = [], idx = [];
+  const cols = rows[0].length;
+  rows.forEach(row => row.forEach(p => pos.push(p[0], p[1], p[2])));
+  for (let i = 0; i + 1 < rows.length; i++)
+    for (let j = 0; j + 1 < cols; j++) {
+      const a = i * cols + j, b = a + 1, c = a + cols, e = c + 1;
+      idx.push(a, c, e, a, e, b);
+    }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat(color, opacity));
+}
+
+function buildBasin(d) {
+  const rows = basinRings(d).map(({ th, fz }) => {
+    const c = Math.cos(th), s = Math.sin(th);
+    const rO = basinR(d, th), rE = trayEdgeR(d, th), rI = d.rInner;
+    return [
+      [rI * c, rI * s, fz],                          // D — chân vách trong
+      [rO * c, rO * s, fz],                          // A — chân vách lòng hốc
+      [rO * c, rO * s, surfZ(d, rO * c)],            // B — mép lòng hốc trên mặt mâm
+      [rE * c, rE * s, surfZ(d, rE * c)],            // C — mép ngoài mâm
+    ];
+  });
+  return stripGeometry(rows, C.tray);
+}
+
+function buildWater(d) {
+  const rows = basinRings(d).map(({ th, fz }) => {
+    const c = Math.cos(th), s = Math.sin(th);
+    const rO = Math.max(basinR(d, th) - 0.6, d.rInner + 0.6), rI = d.rInner + 0.4;
+    const wz = fz + S.keep;
+    return [[rI * c, rI * s, fz], [rO * c, rO * s, fz],
+            [rO * c, rO * s, wz], [rI * c, rI * s, wz]];
+  });
+  return stripGeometry(rows, C.water, 0.42);
+}
+
 // ═════════════════════════════════════════════════ suy ra kích thước
 function derive() {
   const gTilt = S.gtilt / 10, tTilt = S.tilt / 10;
   const gt = Math.tan(gTilt * Math.PI / 180), t = Math.tan(tTilt * Math.PI / 180);
   const trayR = S.tray / 2;
-  const lobeR = S.bore / 2 + P.WALL;
+  const boreR = S.bore / 2;                     // bán kính LÒNG hốc, trong mặt bằng
+  const lobeR = boreR + P.WALL;
   const ringR = S.ring;
-  const centreR = P.CENTRE_BORE / 2 + P.WALL;
+  const centreR = P.CENTRE_BORE / 2;            // đĩa giữa của lòng chậu
+  const rInner = P.POST_OD / 2 + P.WALL;        // vách trong, ôm lấy trục
+  const basinPlanR = ringR + boreR;             // chỗ rộng nhất của phần thụt xuống ly
 
   // Mâm nghiêng cùng góc vành thì song song vành; lệch góc thì không tựa được.
   const trayZ0 = GLASS.RIM_MID_Z + 1;
@@ -358,8 +435,22 @@ function derive() {
   const volCm3 = (Math.PI * trayR * trayR * trayThick
                   - P.N * Math.PI * (S.bore / 2) ** 2 * S.recess) / 1000;
 
+  // Lòng ly ở độ sâu mà chậu thụt xuống — biên dạng nội suy, tra tuyến tính
+  const glassRAt = z => {
+    const prof = [[0, 40], [14, 44], [40, 46.5], [62, 45.2], [GLASS.RIM_HIGH_Z, 45.2]];
+    for (let i = 0; i + 1 < prof.length; i++)
+      if (z <= prof[i + 1][0]) {
+        const [z0, r0] = prof[i], [z1, r1] = prof[i + 1];
+        return r0 + (r1 - r0) * (z - z0) / Math.max(z1 - z0, 1e-6);
+      }
+    return 45.2;
+  };
+  const deepestZ = low.floorZ;
+  const glassClear = glassRAt(deepestZ) - basinPlanR;
+
   return {
-    gTilt, tTilt, gt, t, trayR, lobeR, ringR, centreR, trayZ0, planeZ,
+    gTilt, tTilt, gt, t, trayR, boreR, lobeR, ringR, centreR, rInner,
+    basinPlanR, glassClear, deepestZ, trayZ0, planeZ,
     wells, sorted, top, low, minStep, pitch, merged, neck, boreGap,
     centreTopZ, centreFloorZ, spoutZ, postTopZ,
     tubeLen, submerged, submergeRatio: submerged / tubeLen, maxDischargeZ,
@@ -434,49 +525,18 @@ function rebuild() {
     }
   }
 
-  // ── MÂM: một khối, lòng hốc KHOÉT ÂM. Đường bao lòng là HỢP của sáu hình tròn
-  // + giếng giữa; chỗ nào chồng nhau thì không còn vách, nước thông qua được.
-  const kx = 1 / Math.cos(d.tTilt * Math.PI / 180);   // giãn theo phương dốc
-  const stretch = pts => pts.map(([x, y]) => [x * kx, y]);
-  const basin = stretch(unionOutline(P.N, d.ringR, d.lobeR - P.WALL,
-                                     P.CENTRE_BORE / 2, 0));
-  const trayTop = shapeOf(circlePts(d.trayR), [reverse(basin)]);
-  const gTop = new THREE.ExtrudeGeometry(trayTop,
-    { depth: P.WALL, bevelEnabled: false, curveSegments: 32, steps: 1 });
-  gTop.computeVertexNormals();
-  const tray = new THREE.Mesh(gTop, mat(C.tray));
-  tray.rotation.y = -d.tTilt * Math.PI / 180;
-  tray.position.z = d.trayZ0;
-  model.add(tray);
+  // ── CHẬU: dựng thành MỘT lưới liền, không chồng khối rời lên nhau.
+  //
+  // Bốn vành đồng tâm chạy quanh theo góc, nối lại thành mặt liên tục:
+  //   D (r=rInner, z=sàn)  →  A (r=rOut,  z=sàn)   : SÀN, nằm ngang từng cung
+  //   A                    →  B (r=rOut,  z=mặt mâm nghiêng) : VÁCH lòng hốc
+  //   B                    →  C (r=mép mâm, z=mặt mâm)       : VÀNH gác lên ly
+  // Ở ranh giới hai cung, hai mẫu cùng góc nhưng khác cao độ sàn -> tứ giác sàn
+  // suy biến thành VÁCH BẬC thẳng đứng. Đó chính là ngưỡng tràn.
+  model.add(buildBasin(d));
 
-  // thành ngoài của phần âm, chạy từ mặt mâm xuống tới sàn thấp nhất
-  const skirt = new THREE.ExtrudeGeometry(shapeOf(circlePts(d.trayR),
-                  [reverse(stretch(unionOutline(P.N, d.ringR, d.lobeR, P.CENTRE_BORE / 2 + P.WALL, 0)))]),
-                  { depth: S.recess + 6, bevelEnabled: false, curveSegments: 32, steps: 1 });
-  skirt.computeVertexNormals();
-  const skirtMesh = new THREE.Mesh(skirt, mat(C.tray));
-  skirtMesh.rotation.y = -d.tTilt * Math.PI / 180;
-  skirtMesh.position.z = d.trayZ0;
-  skirtMesh.translateZ(-(S.recess + 6));
-  model.add(skirtMesh);
-
-  // ── SÀN từng hốc: mỗi cái NẰM NGANG ở cao độ riêng, thấp dần theo dốc
-  for (const w of d.wells) {
-    const f = disc(d.lobeR - P.WALL + 0.6, C.floor);
-    f.position.set(w.x, w.y, w.floorZ);
-    model.add(f);
-    const water = lathe([[0, 0], [d.lobeR - P.WALL, 0],
-                         [d.lobeR - P.WALL, S.keep], [0, S.keep], [0, 0]],
-                        C.water, 0.4, 40);
-    water.position.set(w.x, w.y, w.floorZ);
-    model.add(water);
-  }
-  // giếng giữa cho cây leo
-  const cf = lathe([[P.POST_OD / 2, 0], [P.CENTRE_BORE / 2, 0],
-                    [P.CENTRE_BORE / 2, S.keep], [P.POST_OD / 2, S.keep],
-                    [P.POST_OD / 2, 0]], C.water, 0.4, 48);
-  cf.position.z = d.centreFloorZ;
-  model.add(cf);
+  // nước đọng trong từng cung — cũng dựng theo cung, không phải trụ tròn lơ lửng
+  model.add(buildWater(d));
 
   report(d);
 }
@@ -564,6 +624,13 @@ function report(d) {
      d.outerFit ? `outer wall ${(d.trayR - d.ringR - d.lobeR).toFixed(1)} mm thick`
                 : `wells reach past the tray edge - widen the tray or pull the ring in`,
      d.outerFit ? "ok" : "bad"],
+
+    ["Sunken body clears the glass wall",
+     `basin is &#216;${(2 * d.basinPlanR).toFixed(0)} where it drops to ` +
+     `${d.deepestZ.toFixed(0)} mm; the glass is &#216;` +
+     `${(2 * (d.basinPlanR + d.glassClear)).toFixed(0)} there - ` +
+     `${d.glassClear.toFixed(1)} mm of clearance per side`,
+     d.glassClear >= 1.5 ? "ok" : d.glassClear > 0 ? "warn" : "bad"],
 
     ["Well bore takes a root ball",
      `&#216;${S.bore}; V1 proved 26 mm is the floor - it was sized for single roots and failed`,
