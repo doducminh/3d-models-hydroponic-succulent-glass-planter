@@ -7,6 +7,13 @@ line on a perforated top plate.
 Designed for a tumbler with a slanted cut rim, but the parts drop into any glass
 with an inner mouth diameter of **90 mm or more**.
 
+## Preview
+
+[`viewer/index.html`](viewer/index.html) is an interactive 3D view of both parts on a
+scaled print bed. Enable GitHub Pages for this repo (Settings → Pages → Source: main,
+folder `/`) and it becomes browsable at `/viewer/`. Opened straight off disk the
+browser blocks local file reads — drag the `.stl` files onto the canvas instead.
+
 ## Parts
 
 | File | Size | Weight (PETG, solid) | Print orientation |

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<!--
+  Interactive preview of the printable parts in ../stl/
+
+  Served from a web server (GitHub Pages, or `python -m http.server` in the repo
+  root) the STL files load automatically. Opened straight off disk with file://
+  the browser blocks local reads — drag the .stl files onto the canvas instead.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hydroponic Succulent Planter — 3D preview</title>
+<style>
+  :root{--bg:#FAF6F2;--ink:#2A2320;--sub:#6B5F58;--line:#E4D9D1;--accent:#C08A8E;--teal:#5C7F72;}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Avenir Next','Segoe UI',system-ui,sans-serif}
+  header{padding:16px 18px 10px}
+  h1{margin:0;font-size:16px;font-weight:600}
+  header p{margin:6px 0 0;font-size:12px;color:var(--sub);line-height:1.55}
+  #stage{position:relative;width:100%;height:60vh;min-height:340px;touch-action:none;cursor:grab}
+  #stage.grabbing{cursor:grabbing}
+  canvas{display:block}
+  #drop{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(250,246,242,.92);border:2px dashed var(--accent);font-size:14px;color:var(--sub)}
+  #drop.on{display:flex}
+  #msg{position:absolute;left:18px;bottom:12px;font-size:11.5px;color:var(--sub);
+    background:rgba(255,255,255,.8);padding:5px 10px;border-radius:14px;max-width:80%}
+  .panel{padding:12px 18px 22px}
+  .parts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  button{font:inherit;font-size:12px;padding:6px 13px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);border-radius:20px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--accent)}
+  button[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+  table{border-collapse:collapse;font-size:12px;width:100%;max-width:560px}
+  th,td{text-align:left;padding:5px 10px 5px 0;border-bottom:1px solid var(--line)}
+  th{color:var(--sub);font-weight:500}
+  td.num{font-variant-numeric:tabular-nums}
+  .note{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+    font-size:11.5px;color:var(--sub);line-height:1.65;max-width:640px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="ttl"></h1>
+  <p id="sub"></p>
+</header>
+
+<div id="stage">
+  <div id="drop"></div>
+  <div id="msg"></div>
+</div>
+
+<div class="panel">
+  <div class="parts" id="parts"></div>
+  <table><thead><tr><th id="h1"></th><th id="h2"></th><th id="h3"></th></tr></thead>
+    <tbody id="tbl"></tbody></table>
+  <div class="note" id="foot"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script>
+// ══════════════════════════════ CONFIG — sửa phần này cho từng sản phẩm
+const CONFIG = {
+  title:    "Hydroponic Succulent Planter — 3D preview",
+  subtitle: "Drag to rotate, scroll to zoom. The grid is the 225 × 225 mm print bed, "
+          + "10 mm per square. Click a part name to hide it.",
+  bed:      { x: 225, y: 225 },
+  parts: [
+    { file: "../stl/top-plate.stl", name: "Top plate",
+      color: 0xC08A8E, note: "prints flat, face up — no supports" },
+    { file: "../stl/mesh-base.stl", name: "Mesh base",
+      color: 0x5C7F72, note: "prints upright, 5 mm brim — no supports" },
+  ],
+  footer: "PETG · 240 °C nozzle · 80 °C bed · 0.2 mm layers · 4 perimeters · "
+        + "25 % gyroid infill · no supports. Both parts sit inside a glass tumbler with an "
+        + "inner mouth diameter of 90 mm or more. Licence: CC BY-NC-SA 4.0.",
+
+  ui: {
+    drop:     "Drop .stl files here",
+    colPart:  "Part",
+    colSize:  "Bounding size (mm)",
+    colNote:  "Notes",
+    dropped:  "dropped in",
+    fileErr:  "Opened with file:// — the browser blocks reading local STL files. "
+            + "Drop the .stl files onto the canvas, or view this page over GitHub Pages.",
+    loadErr:  "Could not load",
+  },
+};
+// ══════════════════════════════ hết CONFIG
+
+const UI = CONFIG.ui;
+document.getElementById("ttl").textContent = CONFIG.title;
+document.getElementById("sub").textContent = CONFIG.subtitle;
+document.getElementById("foot").textContent = CONFIG.footer;
+document.getElementById("drop").textContent = UI.drop;
+document.getElementById("h1").textContent = UI.colPart;
+document.getElementById("h2").textContent = UI.colSize;
+document.getElementById("h3").textContent = UI.colNote;
+
+const stage = document.getElementById("stage");
+const msgEl = document.getElementById("msg");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xFAF6F2);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 1, 5000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+stage.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f78, 0.85));
+const key = new THREE.DirectionalLight(0xffffff, 0.65);
+key.position.set(1, -1.4, 2);
+scene.add(key);
+
+// Khung vùng in + lưới 10mm, để người xem ước lượng được kích thước thật
+const { x: bx, y: by } = CONFIG.bed;
+const grid = new THREE.GridHelper(Math.max(bx, by), Math.round(Math.max(bx, by) / 10),
+                                  0xD8CCC4, 0xEBE2DB);
+grid.rotation.x = Math.PI / 2;
+scene.add(grid);
+scene.add(new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.PlaneGeometry(bx, by)),
+  new THREE.LineBasicMaterial({ color: 0xC7B8AE })));
+
+const group = new THREE.Group();
+scene.add(group);
+const meshes = [];
+
+function addMesh(geo, part) {
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();
+  const b = geo.boundingBox;
+  // STL xuất từ pipeline này đã có đáy ở z=0 và tâm ở gốc — vẫn căn lại cho chắc
+  geo.translate(-(b.min.x + b.max.x) / 2, -(b.min.y + b.max.y) / 2, -b.min.z);
+
+  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+    color: part.color ?? 0xC08A8E, flatShading: false }));
+  group.add(mesh);
+  meshes.push({ mesh, part });
+
+  const s = new THREE.Vector3().subVectors(b.max, b.min);
+  addRow(part.name, `${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)}`, part.note || "");
+  addToggle(part.name, mesh);
+  fit();
+}
+
+function addRow(name, dims, note) {
+  const tr = document.getElementById("tbl").insertRow();
+  tr.insertCell().textContent = name;
+  const d = tr.insertCell(); d.textContent = dims; d.className = "num";
+  tr.insertCell().textContent = note;
+}
+
+function addToggle(name, mesh) {
+  const b = document.createElement("button");
+  b.textContent = name;
+  b.setAttribute("aria-pressed", "true");
+  b.onclick = () => {
+    mesh.visible = !mesh.visible;
+    b.setAttribute("aria-pressed", String(mesh.visible));
+  };
+  document.getElementById("parts").appendChild(b);
+}
+
+function fit() {
+  const box = new THREE.Box3().setFromObject(group);
+  if (box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3());
+  const r = box.getSize(new THREE.Vector3()).length() / 2 || 60;
+  controls.target.copy(c);
+  camera.position.set(c.x + r * 1.5, c.y - r * 1.9, c.z + r * 1.3);
+  camera.up.set(0, 0, 1);
+  camera.near = r / 100; camera.far = r * 40;
+  camera.updateProjectionMatrix();
+}
+
+const loader = new THREE.STLLoader();
+let pending = CONFIG.parts.length;
+CONFIG.parts.forEach(part => loader.load(
+  part.file,
+  geo => { addMesh(geo, part); if (--pending === 0) msgEl.textContent = ""; },
+  undefined,
+  () => {
+    pending--;
+    msgEl.textContent = location.protocol === "file:"
+      ? UI.fileErr
+      : `${UI.loadErr} ${part.file}`;
+  }));
+
+// Kéo thả — đường thoát khi mở thẳng bằng file://
+const dropEl = document.getElementById("drop");
+["dragenter", "dragover"].forEach(e =>
+  stage.addEventListener(e, ev => { ev.preventDefault(); dropEl.classList.add("on"); }));
+["dragleave", "drop"].forEach(e =>
+  stage.addEventListener(e, ev => { ev.preventDefault(); dropEl.classList.remove("on"); }));
+stage.addEventListener("drop", ev => {
+  msgEl.textContent = "";
+  [...ev.dataTransfer.files].filter(f => /\.stl$/i.test(f.name)).forEach(f => {
+    const fr = new FileReader();
+    fr.onload = () => addMesh(loader.parse(fr.result),
+                             { name: f.name.replace(/\.stl$/i, ""), color: 0xC08A8E, note: UI.dropped });
+    fr.readAsArrayBuffer(f);
+  });
+});
+
+stage.addEventListener("pointerdown", () => stage.classList.add("grabbing"));
+addEventListener("pointerup", () => stage.classList.remove("grabbing"));
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+resize();
+fit();
+
+(function loop() {
+  requestAnimationFrame(loop);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
