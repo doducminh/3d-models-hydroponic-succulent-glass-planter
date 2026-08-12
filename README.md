@@ -9,10 +9,13 @@ with an inner mouth diameter of **90 mm or more**.
 
 ## Preview
 
-[`viewer/index.html`](viewer/index.html) is an interactive 3D view of both parts on a
-scaled print bed. Enable GitHub Pages for this repo (Settings → Pages → Source: main,
-folder `/`) and it becomes browsable at `/viewer/`. Opened straight off disk the
-browser blocks local file reads — drag the `.stl` files onto the canvas instead.
+[`viewer/index.html`](viewer/index.html) shows both parts assembled, on a scaled
+225 × 225 mm print bed. Download it and double-click — it needs no web server and no
+local files, the geometry is packed into the page itself. It is the same mesh as the
+STL files, not a simplified stand-in.
+
+To publish it on the web, enable GitHub Pages (Settings → Pages → Source: main,
+folder `/`) and it becomes browsable at `/viewer/`.
 
 ## Parts
 
