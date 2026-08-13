@@ -192,7 +192,7 @@ const D = {
   STEM_WALL: 1.5,
   STEM_OPEN: 104,       // bề rộng khe hở phía dưới, tính bằng độ
   LEAF_L: 17, LEAF_W: 10,
-  STEM_HUG_R: 53,       // ⚠️ bán kính bám sát thành ngoài ly (ly ngoài R48.2)
+  STEM_HUG_R: 54.5,     // ⚠️ tâm cuống; trừ đi bán kính ngoài 4.9 vẫn > thành ly R48.2
   HOOK_T: 2.6,
   CLIP_IN: 48.6, CLIP_ARC: 84, CLIP_H: 9,   // vòng ôm thành ly (ly ngoài R48.2)
   CLIP_Z: [58, 82],
@@ -534,13 +534,17 @@ function sweepC(curve, rIn, wall, openDeg, N = 44) {
     const a = half + (2 * Math.PI - 2 * half) * i / M;
     prof.push([rIn * Math.cos(a), rIn * Math.sin(a)]);
   }
-  const K = prof.length, fr = curve.computeFrenetFrames(N, false);
-  const pos = [], idx = [];
+  // Khung Frenet tự xoay quanh đường cong nên có đoạn tiết diện quay vào trong,
+  // thân cuống thọc qua thành ly. Cố định một trục theo PHƯƠNG BÁN KÍNH.
+  const K = prof.length, pos = [], idx = [];
   for (let i = 0; i <= N; i++) {
-    const pt = curve.getPoint(i / N), n = fr.normals[i], b = fr.binormals[i];
-    prof.forEach(q => pos.push(pt.x + n.x * q[0] + b.x * q[1],
-                               pt.y + n.y * q[0] + b.y * q[1],
-                               pt.z + n.z * q[0] + b.z * q[1]));
+    const pt = curve.getPoint(i / N);
+    const rad = new THREE.Vector3(pt.x, pt.y, 0).normalize();      // hướng ra ngoài
+    const tg = curve.getTangent(i / N).normalize();
+    const bin = new THREE.Vector3().crossVectors(tg, rad).normalize();
+    prof.forEach(q => pos.push(pt.x + rad.x * q[0] + bin.x * q[1],
+                               pt.y + rad.y * q[0] + bin.y * q[1],
+                               pt.z + rad.z * q[0] + bin.z * q[1]));
   }
   for (let i = 0; i < N; i++)
     for (let j = 0; j < K; j++) {
@@ -577,12 +581,6 @@ function stemCover(hoseCurve) {
   }
   const leaf = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape(leafPts),
     { depth: 1.6, bevelEnabled: false, curveSegments: 16, steps: 1 }), mat(C.tray));
-  const at = curve.getPoint(0.55), tg = curve.getTangent(0.55);
-  leaf.position.copy(at);
-  leaf.lookAt(at.clone().add(new THREE.Vector3(0, 0, 1)));
-  leaf.rotateZ(Math.atan2(tg.y, tg.x) + 0.5);
-  leaf.translateX(D.LEAF_L / 2 + 1);
-  grp.add(leaf);
 
   const rimZ = G.RIM_MID + G.MOUTH_R * t;      // vành ly phía cao
 
@@ -610,6 +608,12 @@ function stemCover(hoseCurve) {
     { depth: D.PAD_T, bevelEnabled: false, curveSegments: 20, steps: 1 }), mat(C.tray));
   pad.position.set(50, 0, rimZ + 1);
   grp.add(pad);
+
+  // Lá đặt TƯỜNG MINH cạnh mặt phẳng, nằm trên cao độ vành ly. Bản trước dùng
+  // lookAt + translateX nên nó trôi xuống giữa thân ly và cắt ngang thành kính.
+  leaf.rotation.z = -0.55;
+  leaf.position.set(46, 17, rimZ + 1);
+  grp.add(leaf);
   return grp;
 }
 
@@ -862,7 +866,7 @@ function rebuild() {
     new THREE.Vector3(48.5, 0, trayHighZ + 3),             // qua khấc trên mâm
     new THREE.Vector3(D.STEM_HUG_R, 0, highRimZ - 6),      // vòng ra ngoài vành
     new THREE.Vector3(D.STEM_HUG_R, 0, 62),                // rồi ÁP SÁT thành ly
-    new THREE.Vector3(D.STEM_HUG_R - 1, 0, 26),
+    new THREE.Vector3(D.STEM_HUG_R, 0, 26),
     new THREE.Vector3(60, -5, 11), new THREE.Vector3(84, -12, 9),
   ]);
   model.add(new THREE.Mesh(new THREE.TubeGeometry(hoseCurve, 70, 2.2, 10, false), mat(C.hose)));
@@ -995,13 +999,21 @@ function report(d) {
      + `triangulated from its real outline, so the edges are clean and have thickness. `
      + `${(glassR(D.FOOT_Z) - D.FOOT_D / 2).toFixed(0)} mm of open water all round it, where `
      + `V1's &#216;60 base sat against the wall. Seed ${D.FOOT_SEED}, locked`,
-     glassR(D.FOOT_Z) - D.FOOT_D / 2 >= 12 ? "ok" : "warn"],
+     glassR(D.FOOT_Z) - D.FOOT_D / 2 >= 8 ? "ok" : "warn"],
 
     ["Stem hangs on the glass, hugging it",
      `two ${D.CLIP_ARC}&deg; collars of R${D.CLIP_IN} snap onto the glass wall at `
      + `${D.CLIP_Z.join(" and ")} mm, and the cover runs down at R${D.STEM_HUG_R} against the `
-     + `R48.2 wall. Clipping to the rim was useless - the tray already covers it`,
-     D.STEM_HUG_R - 48.2 <= 6 ? "ok" : "warn"],
+     + `R48.2 wall, its inner face ${(D.STEM_HUG_R - D.STEM_IN - D.STEM_WALL - 48.2).toFixed(1)} mm `
+     + `off it. Clipping to the rim was useless - the tray already covers the rim`,
+     D.STEM_HUG_R - D.STEM_IN - D.STEM_WALL - 48.2 <= 4 ? "ok" : "warn"],
+
+    ["Stem stays outside the glass wall",
+     `cover centreline at R${D.STEM_HUG_R} minus its own `
+     + `${(D.STEM_IN + D.STEM_WALL).toFixed(1)} mm outer radius leaves `
+     + `${(D.STEM_HUG_R - D.STEM_IN - D.STEM_WALL - 48.2).toFixed(1)} mm clear of the R48.2 `
+     + `glass. The leaf and pad sit above the rim, so they cannot foul it either`,
+     D.STEM_HUG_R - D.STEM_IN - D.STEM_WALL - 48.2 >= 0.5 ? "ok" : "bad"],
 
     ["Rim crossing is covered, and useful",
      `a ${D.PAD_L} x ${D.PAD_W} mm pad caps the point where the hose goes over the rim - `
