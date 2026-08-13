@@ -177,7 +177,8 @@ const D = {
   // ⚠️ Chiều cao vành ống rễ KHÔNG đặt tay — suy ra từ khe an toàn dưới đây.
   //    Vành cao bao nhiêu thì mặt nước dâng lên bấy nhiêu; dâng quá là chạm lá.
   CROWN_GAP: 3,         // ⚠️ mặt nước phải thấp hơn đáy bầu rễ ít nhất bấy nhiêu
-  ROOT_HOLE: 20,        // ⚠️ = bề rộng bầu rễ, để cả chùm chui xuống ly được
+  ROOT_HOLE: 14,        // ⚠️ Ø20 thì vành nước chỉ còn 2mm — xem mục đánh đổi
+  CHIMNEY_W: 2,         // thành ống rễ
 
   // ── CHÂN ĐẾ: kế thừa đế lưới V1 nhưng THU NHỎ, chừa chỗ cho cá bơi quanh
   FOOT_D: 64,           // to hơn cho vững; cá chui XUYÊN QUA lỗ chứ không chỉ bơi vòng
@@ -659,6 +660,9 @@ function derive() {
   return {
     br, wells, top, low, pitch, merged, neck, postGap, portZ, riserZ,
     chimneyH,
+    ringW: br - (D.ROOT_HOLE / 2 + D.CHIMNEY_W),
+    ringMl: Math.PI * (br ** 2 - (D.ROOT_HOLE / 2 + D.CHIMNEY_W) ** 2)
+            * (D.WELL_DEPTH + D.SPOON_DEPTH - D.CROWN_GAP) / 1000,
     // đỉnh tán cây cao nhất: hoa thị đặt ở local z = -SEAT_DROP+10, cao thêm 10
     canopyZ: Math.max(...wells.map(w => w.topZ)) + (10 + 10 - D.SEAT_DROP)
              * Math.cos(G.TILT * Math.PI / 180),
@@ -733,19 +737,24 @@ function rebuild() {
   for (const w of d.wells) {
     // Biên dạng ĐẦY ĐỦ, có thành dày thật và LỖ XUYÊN đáy cho ống rễ.
     const rh = D.ROOT_HOLE / 2, chimneyH = d.chimneyH;
+    // Biên dạng phải là ĐA GIÁC ĐƠN. Bản trước đi từ vành ống rễ (r=12) vào r=7
+    // rồi lại ra r=12.3 — tự cắt chính nó, lathe sinh ra mặt rối, và đó là mớ
+    // hỗn độn nhìn thấy trong hốc.
+    const rs = D.SEAT_BORE / 2, rc = rh + D.CHIMNEY_W;
     const well = lathe([
-      [d.br + D.WALL, 0],                                  // mép ngoài, ngang mặt mâm
-      [d.br + D.WALL, -deep - D.WALL],                     // thành ngoài xuống đáy
-      [rh, -deep - D.WALL],                                // ⚠️ MẶT DƯỚI, hở tới lỗ rễ
-      [rh, -deep + chimneyH],                           // lòng ống rễ đi lên
-      [rh + 2, -deep + chimneyH],                       // vành ống rễ
-      [rh + 2, -deep],
-      [d.br * 0.5, -deep], [d.br * 0.88, -deep + 2.5],     // lòng muỗng
-      [d.br, -D.SEAT_DROP - D.WELL_DEPTH],                 // miệng muỗng
-      [D.SEAT_BORE / 2, -D.SEAT_DROP - D.WELL_DEPTH],
-      [D.SEAT_BORE / 2, -D.SEAT_DROP],                     // vành đỡ bầu rễ
-      [d.br, -D.SEAT_DROP],
-      [d.br, 0], [d.br + D.WALL, 0],
+      [d.br + D.WALL, 0],                       // mép ngoài, ngang mặt mâm
+      [d.br + D.WALL, -deep - D.WALL],          // thành ngoài xuống mặt dưới
+      [rh, -deep - D.WALL],                     // mặt dưới, hở tới lỗ rễ
+      [rh, -deep + chimneyH],                   // lòng ống rễ đi lên
+      [rc, -deep + chimneyH],                   // ⚠️ VÀNH ống rễ = ngưỡng giữ nước
+      [rc, -deep],                              // thành ngoài ống rễ xuống sàn
+      [d.br, -deep],                            // SÀN MUỖNG ra tới vách hốc
+      [d.br, -D.SEAT_DROP - D.WELL_DEPTH],      // vách muỗng đi lên
+      [rs, -D.SEAT_DROP - D.WELL_DEPTH],        // thắt vào
+      [rs, -D.SEAT_DROP],                       // lòng cổ hốc
+      [d.br, -D.SEAT_DROP],                     // ⚠️ VAI ĐỠ bầu rễ
+      [d.br, 0],                                // vách hốc lên miệng
+      [d.br + D.WALL, 0],
     ], C.tray, undefined, 64);
     well.position.set(w.lx, w.ly, 0);
     body.add(well);
@@ -792,10 +801,11 @@ function rebuild() {
     const rows = [];
     for (let i = 0; i <= 40; i++) {
       const a = 2 * Math.PI * i / 40, c = Math.cos(a), s = Math.sin(a), r = d.br - 1;
-      rows.push([[w.lx + (D.ROOT_HOLE / 2 + 2) * c, w.ly + (D.ROOT_HOLE / 2 + 2) * s, w.floorZ],
+      const ri = D.ROOT_HOLE / 2 + D.CHIMNEY_W;
+      rows.push([[w.lx + ri * c, w.ly + ri * s, w.floorZ],
                  [w.lx + r * c, w.ly + r * s, w.floorZ],
                  [w.lx + r * c, w.ly + r * s, w.keepZ],
-                 [w.lx + (D.ROOT_HOLE / 2 + 2) * c, w.ly + (D.ROOT_HOLE / 2 + 2) * s, w.keepZ]]);
+                 [w.lx + ri * c, w.ly + ri * s, w.keepZ]]);
     }
     model.add(strip(rows, C.water, 0.5));
   }
@@ -939,10 +949,11 @@ function report(d) {
      + `through the &#216;${D.ROOT_HOLE} chimney into the glass`,
      D.SEAT_DROP + D.ROOT_LEN > D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH ? "ok" : "warn"],
 
-    ["Puddle still rings the chimney",
-     `${((S.bore - D.ROOT_HOLE) / 2).toFixed(1)} mm wide collar of standing water round the `
-     + `root mass, for when the reservoir drops`,
-     (S.bore - D.ROOT_HOLE) / 2 >= 3 ? "ok" : "warn"],
+    ["This is where the water actually sits",
+     `a ring ${d.ringW.toFixed(1)} mm wide and ${d.chimneyH} mm deep between the chimney wall `
+     + `and the well wall - about ${d.ringMl.toFixed(1)} ml per well. The chimney rim is the `
+     + `weir: fill past it and the surplus goes down the hole`,
+     d.ringW >= 4 && d.ringMl >= 1 ? "ok" : d.ringW >= 2 ? "warn" : "bad"],
 
     ["Roots pass through the puddle on the way down",
      `ball sits ${D.SEAT_DROP} mm below the rim; the puddle sits `
