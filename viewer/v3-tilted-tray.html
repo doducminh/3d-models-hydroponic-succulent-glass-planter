@@ -426,8 +426,7 @@ function footHoles() {
           const sPos = rad + 4 + rnd() * (circ - 2 * rad - 8);
           const ok = out.every(o => {
             let ds = Math.abs(o.s - sPos); ds = Math.min(ds, circ - ds);
-            // >= 2x lề đoạn (3mm) thì hai đoạn tam giác hoá không chồng nhau
-            return Math.hypot(ds, o.y - y) >= o.r + rad + 5;
+            return Math.hypot(ds, o.y - y) >= o.r + rad + 3.5;
           });
           if (ok) {
             // hình phức tạp chỉ dùng khi đủ lớn, dưới ngưỡng thì tròn
@@ -444,6 +443,7 @@ function footHoles() {
   return { holes: out, circ, rB, rT };
 }
 
+let RENDERED_HOLES = 0;
 function footSkirt() {
   const { holes, circ, rB, rT } = footHoles();
   const H = D.FOOT_H;
@@ -451,22 +451,33 @@ function footSkirt() {
   // Chia tấm trải thành TỪNG ĐOẠN theo phương vòng: mỗi lỗ một đoạn riêng, phần
   // trống chia nhỏ ≤6mm. Tam giác hoá cả tấm một lần thì earcut nối hai điểm rất
   // xa nhau, cuốn lên hình côn thành dây cung -> nón vỡ ra thành mặt phẳng.
+  // Rải lỗ là bài toán HAI CHIỀU, chia đoạn tam giác hoá là MỘT CHIỀU. Hai lỗ
+  // cùng dải s nhưng khác cao độ là hợp lệ, nhưng lại rơi vào cùng một đoạn.
+  // Bản trước thấy đoạn chồng thì BỎ LUÔN lỗ — nên có mảng váy trống trơn.
+  // Cách đúng: gom các lỗ trùng dải s thành MỘT CỤM, đoạn đó chứa cả cụm.
+  const M = 2;
   const segs = [];
   const plain = (a, b) => {
     const n = Math.max(1, Math.ceil((b - a) / 6));
     for (let i = 0; i < n; i++)
-      segs.push({ a: a + (b - a) * i / n, b: a + (b - a) * (i + 1) / n, hole: null });
+      segs.push({ a: a + (b - a) * i / n, b: a + (b - a) * (i + 1) / n, holes: [] });
   };
   const sorted = holes.slice().sort((x, y) => x.s - y.s);
-  let cur = 0;
+  const clusters = [];
   for (const h of sorted) {
-    const a = h.s - h.r - 2, b = h.s + h.r + 2;
-    if (a < cur) continue;                    // đoạn chồng đoạn trước -> bỏ lỗ này
-    if (a > cur) plain(cur, a);
-    segs.push({ a, b, hole: h });
-    cur = b;
+    const a = h.s - h.r - M, b = h.s + h.r + M;
+    const last = clusters[clusters.length - 1];
+    if (last && a <= last.b) { last.b = Math.max(last.b, b); last.holes.push(h); }
+    else clusters.push({ a, b, holes: [h] });
+  }
+  let cur = 0;
+  for (const c of clusters) {
+    if (c.a > cur) plain(cur, c.a);
+    segs.push({ a: Math.max(c.a, cur), b: c.b, holes: c.holes });
+    cur = c.b;
   }
   if (cur < circ) plain(cur, circ);
+  RENDERED_HOLES = clusters.reduce((a, c) => a + c.holes.length, 0);
 
   const pos = [], idx = [];
   const put = (v, inner) => {
@@ -481,9 +492,9 @@ function footSkirt() {
     for (let i = 0; i <= n; i++) ring.push(new THREE.Vector2(sg.a + (sg.b - sg.a) * i / n, 0));
     for (let i = n; i >= 0; i--) ring.push(new THREE.Vector2(sg.a + (sg.b - sg.a) * i / n, H));
     const shape = new THREE.Shape(ring);
-    if (sg.hole) {
-      const pts = shapePts(sg.hole.kind, sg.hole.r)
-        .map(q => new THREE.Vector2(sg.hole.s + q[0], sg.hole.y + q[1]));
+    for (const h of sg.holes) {
+      const pts = shapePts(h.kind, h.r)
+        .map(q => new THREE.Vector2(h.s + q[0], h.y + q[1]));
       pts.reverse();
       shape.holes.push(new THREE.Path(pts));
     }
@@ -1088,10 +1099,11 @@ function report(d) {
      d.foot.betta >= 1 && d.foot.guppy >= 3 ? "ok" : "warn"],
 
     ["Scatter actually covers the skirt",
-     `${d.foot.n} holes, ${d.foot.cover.toFixed(0)} % of the skirt open. Big shapes are placed `
-     + `first and anything that will not fit shrinks ${(D.FOOT_SHRINK * 100).toFixed(0)} % and `
-     + `tries again, up to ${D.FOOT_TRIES} times - plain scattering jams after a handful`,
-     d.foot.cover >= 25 && d.foot.n >= 12 ? "ok" : "warn"],
+     `${d.foot.n} holes generated, ${RENDERED_HOLES} actually cut, `
+     + `${d.foot.cover.toFixed(0)} % of the skirt open. Big shapes go first and anything that `
+     + `will not fit shrinks ${(D.FOOT_SHRINK * 100).toFixed(0)} % and retries, up to `
+     + `${D.FOOT_TRIES} times`,
+     RENDERED_HOLES === d.foot.n && d.foot.cover >= 25 ? "ok" : "warn"],
 
     ["Skirt still has something to stand on",
      `${(100 - d.foot.cover).toFixed(0)} % solid; it is the only thing holding the riser `
