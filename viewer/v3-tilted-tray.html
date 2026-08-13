@@ -179,10 +179,11 @@ const D = {
   ROOT_HOLE: 20,        // ⚠️ = bề rộng bầu rễ, để cả chùm chui xuống ly được
 
   // ── CHÂN ĐẾ: kế thừa đế lưới V1 nhưng THU NHỎ, chừa chỗ cho cá bơi quanh
-  FOOT_D: 48,           // V1 là Ø60 sát thành ly; giờ hẹp lại lấy chỗ bơi
-  FOOT_H: 30,
+  FOOT_D: 64,           // to hơn cho vững; cá chui XUYÊN QUA lỗ chứ không chỉ bơi vòng
+  FOOT_H: 36,
+  FOOT_WALL: 2.4,
   FOOT_SEED: 7,         // ⚠️ khoá cứng — đổi số là ra bố cục lỗ khác hẳn
-  FOOT_SHAPES: 10,      // số lỗ hình trên váy đế — ít mà to, cá chui lọt
+  FOOT_SHAPES: 11,      // số lỗ hình trên váy đế — ít mà to, cá chui lọt
 
   // ── GỜ MÓC DÂY trên ống nâng, giữ dây khí khỏi lơ lửng
   CLIP_N: 3, CLIP_R: 3.4,
@@ -344,25 +345,33 @@ function trayEdgeR(th) {
 }
 
 // ════════════════════════ lỗ hình trên váy đế (kiểu đế lưới V1)
-// Bốn biên dạng viết bằng hàm bán kính theo góc — đủ để nhìn ra hình. Bản in
-// thật dùng lib/shapes.py, ở đó còn có bó hoa và capybara.
-function shapeR(kind, ang, r) {
-  const a = ((ang % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-  if (kind === "circle") return r;
-  if (kind === "flower") return r * (0.64 + 0.36 * Math.cos(6 * a));
-  if (kind === "star") {
-    const seg = Math.PI / 5, k = Math.floor(a / seg), f = (a - k * seg) / seg;
-    const r0 = k % 2 === 0 ? r : r * 0.47, r1 = k % 2 === 0 ? r * 0.47 : r;
-    return r0 + (r1 - r0) * f;
+// Sinh thẳng ĐIỂM BIÊN, rồi CHUẨN HOÁ về đúng bán kính r. Bản trước dùng hàm
+// bán kính-theo-góc cho trái tim, mà công thức đó cho bán kính thật gấp ~2.5 lần
+// số danh nghĩa -> lỗ tràn ra ngoài tấm trải và làm vỡ tam giác hoá.
+function shapePts(kind, r, n = 76) {
+  const P = [];
+  for (let i = 0; i < n; i++) {
+    const a = 2 * Math.PI * i / n;
+    if (kind === "circle") P.push([Math.cos(a), Math.sin(a)]);
+    else if (kind === "flower") {
+      const k = 0.64 + 0.36 * Math.cos(6 * a);
+      P.push([k * Math.cos(a), k * Math.sin(a)]);
+    } else if (kind === "star") {
+      const seg = Math.PI / 5, j = Math.floor(a / seg), f = (a - j * seg) / seg;
+      const r0 = j % 2 === 0 ? 1 : 0.47, r1 = j % 2 === 0 ? 0.47 : 1;
+      const k = r0 + (r1 - r0) * f;
+      P.push([k * Math.cos(a), k * Math.sin(a)]);
+    } else {                                   // tim — cùng công thức lib/shapes.py
+      P.push([16 * Math.sin(a) ** 3,
+              13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a)]);
+    }
   }
-  // tim: bán kính theo góc, đỉnh nhọn quay XUỐNG để in không phải bắc cầu
-  const s = Math.sin(a), c = Math.cos(a);
-  return r * 0.62 * (2 - 2 * s + s * Math.sqrt(Math.abs(c)) / (s + 1.4));
+  let m = 0;
+  P.forEach(q => { m = Math.max(m, Math.abs(q[0]), Math.abs(q[1])); });
+  const k = r / m;
+  return P.map(q => [q[0] * k, q[1] * k]);
 }
-function inShape(kind, dx, dy, r) {
-  const d = Math.hypot(dx, dy);
-  return d <= shapeR(kind, Math.atan2(dy, dx), r);
-}
+
 // gieo ngẫu nhiên có khoá hạt, thả lỗ lớn trước — đúng cách V1 làm
 function footHoles() {
   let s = D.FOOT_SEED >>> 0;
@@ -371,49 +380,94 @@ function footHoles() {
   const rB = D.FOOT_D / 2, rT = D.RISER_OD / 2 + 4;
   const circ = 2 * Math.PI * (rB + rT) / 2;
   const out = [];
-  const sizes = [];
-  for (let i = 0; i < D.FOOT_SHAPES; i++) sizes.push(9.0 - 4.2 * i / D.FOOT_SHAPES);
-  for (const rad of sizes) {
-    for (let tries = 0; tries < 400; tries++) {
-      const u = 0.20 + rnd() * 0.58;                 // chừa vành trên và vành dưới
-      const sPos = rnd() * circ;
+  for (let i = 0; i < D.FOOT_SHAPES; i++) {
+    const rad = 9.5 - 4.4 * i / D.FOOT_SHAPES;
+    const yMin = rad + 3.5, yMax = D.FOOT_H - rad - 3.5;
+    if (yMax <= yMin) continue;                // lỗ to hơn cả tấm thì bỏ
+    for (let tries = 0; tries < 500; tries++) {
+      const y = yMin + rnd() * (yMax - yMin);
+      const sPos = rad + 5 + rnd() * (circ - 2 * rad - 10);
       const ok = out.every(o => {
         let ds = Math.abs(o.s - sPos); ds = Math.min(ds, circ - ds);
-        return Math.hypot(ds, (o.u - u) * D.FOOT_H) >= o.r + rad + 3.2;
+        return Math.hypot(ds, o.y - y) >= o.r + rad + 3.4;
       });
-      if (ok) { out.push({ s: sPos, u, r: rad, kind: kinds[out.length % 4] }); break; }
+      if (ok) { out.push({ s: sPos, y, r: rad, kind: kinds[out.length % 4] }); break; }
     }
   }
   return { holes: out, circ, rB, rT };
 }
+
 function footSkirt() {
   const { holes, circ, rB, rT } = footHoles();
-  const NA = 200, NH = 34, pos = [], idx = [];
-  const P3 = (a, u) => {
-    const r = rB + (rT - rB) * u;
-    return [r * Math.cos(a), r * Math.sin(a), D.FOOT_Z + D.FOOT_H * u];
+  const H = D.FOOT_H;
+
+  // Chia tấm trải thành TỪNG ĐOẠN theo phương vòng: mỗi lỗ một đoạn riêng, phần
+  // trống chia nhỏ ≤6mm. Tam giác hoá cả tấm một lần thì earcut nối hai điểm rất
+  // xa nhau, cuốn lên hình côn thành dây cung -> nón vỡ ra thành mặt phẳng.
+  const segs = [];
+  const plain = (a, b) => {
+    const n = Math.max(1, Math.ceil((b - a) / 6));
+    for (let i = 0; i < n; i++)
+      segs.push({ a: a + (b - a) * i / n, b: a + (b - a) * (i + 1) / n, hole: null });
   };
-  let n = 0;
-  for (let i = 0; i < NA; i++)
-    for (let j = 0; j < NH; j++) {
-      const a0 = 2 * Math.PI * i / NA, a1 = 2 * Math.PI * (i + 1) / NA;
-      const u0 = j / NH, u1 = (j + 1) / NH;
-      const sM = (a0 + a1) / 2 / (2 * Math.PI) * circ, uM = (u0 + u1) / 2;
-      let cut = false;
-      for (const h of holes) {
-        let ds = sM - h.s;
-        if (ds > circ / 2) ds -= circ; else if (ds < -circ / 2) ds += circ;
-        if (inShape(h.kind, ds, (uM - h.u) * D.FOOT_H, h.r)) { cut = true; break; }
-      }
-      if (cut) continue;
-      const q = [P3(a0, u0), P3(a1, u0), P3(a1, u1), P3(a0, u1)];
-      q.forEach(v => pos.push(v[0], v[1], v[2]));
-      idx.push(n, n + 1, n + 2, n, n + 2, n + 3);
-      n += 4;
+  const sorted = holes.slice().sort((x, y) => x.s - y.s);
+  let cur = 0;
+  for (const h of sorted) {
+    const a = h.s - h.r - 3, b = h.s + h.r + 3;
+    if (a > cur) plain(cur, a);
+    segs.push({ a, b, hole: h });
+    cur = b;
+  }
+  if (cur < circ) plain(cur, circ);
+
+  const pos = [], idx = [];
+  const put = (v, inner) => {
+    const u = v.y / H, ang = v.x / circ * 2 * Math.PI;
+    const r = rB + (rT - rB) * u - (inner ? D.FOOT_WALL : 0);
+    pos.push(r * Math.cos(ang), r * Math.sin(ang), D.FOOT_Z + H * u);
+  };
+
+  for (const sg of segs) {
+    // đường bao đoạn, lấy mẫu dày theo phương vòng cho nón mượt
+    const n = Math.max(2, Math.ceil((sg.b - sg.a) / 2.5)), ring = [];
+    for (let i = 0; i <= n; i++) ring.push(new THREE.Vector2(sg.a + (sg.b - sg.a) * i / n, 0));
+    for (let i = n; i >= 0; i--) ring.push(new THREE.Vector2(sg.a + (sg.b - sg.a) * i / n, H));
+    const shape = new THREE.Shape(ring);
+    if (sg.hole) {
+      const pts = shapePts(sg.hole.kind, sg.hole.r)
+        .map(q => new THREE.Vector2(sg.hole.s + q[0], sg.hole.y + q[1]));
+      pts.reverse();
+      shape.holes.push(new THREE.Path(pts));
     }
+    const pd = shape.extractPoints(1);
+    const faces = THREE.ShapeUtils.triangulateShape(pd.shape, pd.holes);
+    const flat = pd.shape.concat(...pd.holes);
+    const base = pos.length / 3, N = flat.length;
+    flat.forEach(v => put(v, false));
+    flat.forEach(v => put(v, true));
+    faces.forEach(f => {
+      idx.push(base + f[0], base + f[1], base + f[2]);
+      idx.push(base + f[2] + N, base + f[1] + N, base + f[0] + N);
+    });
+    // Dải nối hai mặt: chỉ ở mép trên/dưới và quanh lỗ. KHÔNG nối ở hai cạnh đứng
+    // — đó là chỗ hai đoạn kề nhau gặp nhau, dựng vách ở đó là có tường trong ruột.
+    let off = 0;
+    for (const loop of [pd.shape, ...pd.holes]) {
+      const L = loop.length, isOuter = off === 0;
+      for (let i = 0; i < L; i++) {
+        const j = (i + 1) % L;
+        if (isOuter && Math.abs(loop[i].x - loop[j].x) < 1e-6) continue;   // cạnh đứng
+        const a = base + off + i, b = base + off + j;
+        idx.push(a, b, b + N, a, b + N, a + N);
+      }
+      off += L;
+    }
+  }
+
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  g.setIndex(idx); g.computeVertexNormals();
+  g.setIndex(idx);
+  g.computeVertexNormals();
   return new THREE.Mesh(g, mat(C.tube));
 }
 
@@ -622,9 +676,10 @@ function rebuild() {
   // Bản in thật sẽ lấy đủ bộ biên dạng từ lib/shapes.py (có cả capybara).
   riserG.add(footSkirt());
   // vành chân và vành cổ, nối các nan lại
-  riserG.add(lathe([[D.FOOT_D / 2 - 3, D.FOOT_Z], [D.FOOT_D / 2, D.FOOT_Z],
-                    [D.FOOT_D / 2, D.FOOT_Z + 3], [D.FOOT_D / 2 - 3, D.FOOT_Z + 3],
-                    [D.FOOT_D / 2 - 3, D.FOOT_Z]], C.tube, undefined, 56));
+  riserG.add(lathe([[D.FOOT_D / 2 - D.FOOT_WALL - 1.5, D.FOOT_Z], [D.FOOT_D / 2 + 1.5, D.FOOT_Z],
+                    [D.FOOT_D / 2 + 1.5, D.FOOT_Z + 3.5],
+                    [D.FOOT_D / 2 - D.FOOT_WALL - 1.5, D.FOOT_Z + 3.5],
+                    [D.FOOT_D / 2 - D.FOOT_WALL - 1.5, D.FOOT_Z]], C.tube, undefined, 64));
   riserG.add(lathe([[D.RISER_OD / 2, D.FOOT_Z + D.FOOT_H],
                     [D.RISER_OD / 2 + 3, D.FOOT_Z + D.FOOT_H],
                     [D.RISER_OD / 2 + 3, D.FOOT_Z + D.FOOT_H + 2],
@@ -787,8 +842,9 @@ function report(d) {
      D.CROWN_GAP >= 2 && D.ROOT_HOLE >= 2.5 * D.PORT_D ? "ok" : "warn"],
 
     ["Foot leaves room for fish",
-     `&#216;${D.FOOT_D} solid skirt with ${D.FOOT_SHAPES} cut-outs - hearts, stars, flowers `
-     + `and circles, the same idea as the V1 mesh base. `
+     `&#216;${D.FOOT_D} solid skirt, ${D.FOOT_WALL} mm wall, with ${D.FOOT_SHAPES} cut-outs - `
+     + `hearts, stars, flowers and circles, the same idea as the V1 mesh base. Each opening is `
+     + `triangulated from its real outline, so the edges are clean and have thickness. `
      + `${(glassR(D.FOOT_Z) - D.FOOT_D / 2).toFixed(0)} mm of open water all round it, where `
      + `V1's &#216;60 base sat against the wall. Seed ${D.FOOT_SEED}, locked`,
      glassR(D.FOOT_Z) - D.FOOT_D / 2 >= 12 ? "ok" : "warn"],
