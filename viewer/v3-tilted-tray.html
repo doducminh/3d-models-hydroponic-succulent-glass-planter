@@ -192,6 +192,15 @@ const D = {
   STEM_WALL: 1.5,
   STEM_OPEN: 104,       // bề rộng khe hở phía dưới, tính bằng độ
   LEAF_L: 17, LEAF_W: 10,
+  STEM_HUG_R: 53,       // ⚠️ bán kính bám sát thành ngoài ly (ly ngoài R48.2)
+  HOOK_T: 2.6,
+  CLIP_IN: 48.6, CLIP_ARC: 84, CLIP_H: 9,   // vòng ôm thành ly (ly ngoài R48.2)
+  CLIP_Z: [58, 82],
+  PAD_L: 34, PAD_W: 22, PAD_T: 2.6,         // mặt phẳng che chỗ dây vắt qua
+
+  // ── miệng trụ: đĩa hoa anh đào thay cho cái phễu
+  MOUTH_R: 21, MOUTH_PET: 9, MOUTH_RING: 13, MOUTH_CORE: 12,
+  MOUTH_LIP: 6,         // chiều cao lòng đĩa
 
   // ── GỜ MÓC DÂY trên ống nâng, giữ dây khí khỏi lơ lửng
   CLIP_N: 3, CLIP_R: 3.4,
@@ -479,6 +488,38 @@ function footSkirt() {
   return new THREE.Mesh(g, mat(C.tube));
 }
 
+// ════════════════════════ ĐĨA HOA ở miệng trụ
+// Bán kính đổi theo góc nên không dùng lathe được — dựng bằng dải, mỗi vòng là
+// một mặt cắt của đĩa, bán kính ngoài lấy từ đường bao 5 cánh.
+function blossomDish(z0, rBore) {
+  const rows = [], SEG = 200;
+  for (let i = 0; i <= SEG; i++) {
+    const a = 2 * Math.PI * i / SEG, c = Math.cos(a), s = Math.sin(a);
+    let rp = D.MOUTH_CORE;
+    for (let k = 0; k < 5; k++) {
+      const dp = a - 2 * Math.PI * k / 5, q = D.MOUTH_RING * Math.sin(dp);
+      if (Math.abs(q) <= D.MOUTH_PET)
+        rp = Math.max(rp, D.MOUTH_RING * Math.cos(dp)
+                          + Math.sqrt(D.MOUTH_PET * D.MOUTH_PET - q * q));
+    }
+    for (let k = 0; k < 5; k++) {                        // khía chẻ đầu cánh
+      let dp = a - 2 * Math.PI * k / 5;
+      dp = Math.atan2(Math.sin(dp), Math.cos(dp));
+      const half = 10 * Math.PI / 180;
+      if (Math.abs(dp) < half) rp -= 1.5 * (1 - Math.abs(dp) / half);
+    }
+    const P = [[rBore, z0 + D.MOUTH_LIP],                // mép trong, ngang miệng trụ
+               [rBore, z0],                              // lòng đĩa
+               [rp - 1.6, z0 + D.MOUTH_LIP - 1],         // cánh loe lên
+               [rp, z0 + D.MOUTH_LIP],
+               [rp, z0 + D.MOUTH_LIP - 2.2],
+               [rBore + 1.6, z0 - 2.2],
+               [rBore, z0 + D.MOUTH_LIP]];
+    rows.push(P.map(([r, z]) => [r * c, r * s, z]));
+  }
+  return strip(rows, C.post);
+}
+
 // ════════════════════════ CUỐNG HOA che dây khí
 // Quét một tiết diện chữ C dọc đường cong: vòng ngoài rồi vòng trong ngược chiều
 // -> ống có thành thật, hở một khe dưới bụng để bấm lên dây.
@@ -522,7 +563,7 @@ function stemCover(hoseCurve) {
   const grp = new THREE.Group();
   // Lấy điểm THẲNG TỪ đường dây khí — vẽ một đường cong riêng thì cuống chạy
   // song song bên cạnh dây chứ không ôm lấy nó.
-  const t0 = 0.50, t1 = 0.88, pts = [];
+  const t0 = 0.52, t1 = 0.88, pts = [];
   for (let i = 0; i <= 8; i++) pts.push(hoseCurve.getPoint(t0 + (t1 - t0) * i / 8));
   const curve = new THREE.CatmullRomCurve3(pts);
   grp.add(new THREE.Mesh(sweepC(curve, D.STEM_IN, D.STEM_WALL, D.STEM_OPEN), mat(C.tray)));
@@ -536,12 +577,39 @@ function stemCover(hoseCurve) {
   }
   const leaf = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape(leafPts),
     { depth: 1.6, bevelEnabled: false, curveSegments: 16, steps: 1 }), mat(C.tray));
-  const at = curve.getPoint(0.62), tg = curve.getTangent(0.62);
+  const at = curve.getPoint(0.55), tg = curve.getTangent(0.55);
   leaf.position.copy(at);
   leaf.lookAt(at.clone().add(new THREE.Vector3(0, 0, 1)));
   leaf.rotateZ(Math.atan2(tg.y, tg.x) + 0.5);
   leaf.translateX(D.LEAF_L / 2 + 1);
   grp.add(leaf);
+
+  const rimZ = G.RIM_MID + G.MOUTH_R * t;      // vành ly phía cao
+
+  // ── VÒNG ÔM THÀNH LY: mâm đã trùm qua vành rồi nên móc quàng vành nằm lọt
+  // dưới mâm, vô dụng. Kẹp xuống THÀNH ly bên dưới, kiểu kẹp ống trên lọ.
+  for (const zc of D.CLIP_Z) {
+    const rows = [], half = D.CLIP_ARC * Math.PI / 360;
+    for (let i = 0; i <= 40; i++) {
+      const a = -half + 2 * half * i / 40, c = Math.cos(a), s = Math.sin(a);
+      const ri = D.CLIP_IN, ro = D.CLIP_IN + D.HOOK_T;
+      rows.push([[ri * c, ri * s, zc], [ro * c, ro * s, zc],
+                 [ro * c, ro * s, zc + D.CLIP_H], [ri * c, ri * s, zc + D.CLIP_H]]);
+    }
+    grp.add(strip(rows, C.tray));
+  }
+
+  // ── MẶT PHẲNG che chỗ dây vắt qua vành, đồng thời là chỗ để đồ
+  const padPts = [];
+  for (let i = 0; i < 48; i++) {
+    const u = 2 * Math.PI * i / 48;
+    padPts.push(new THREE.Vector2(D.PAD_L / 2 * Math.cos(u),
+                                  D.PAD_W / 2 * Math.sin(u) * (0.72 + 0.28 * Math.cos(u))));
+  }
+  const pad = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape(padPts),
+    { depth: D.PAD_T, bevelEnabled: false, curveSegments: 20, steps: 1 }), mat(C.tray));
+  pad.position.set(50, 0, rimZ + 1);
+  grp.add(pad);
   return grp;
 }
 
@@ -678,10 +746,11 @@ function rebuild() {
   const postG = new THREE.Group();
   postG.position.z = (S.explode ? 52 : 0) + D.TRAY_Z0;
   postG.add(lathe([[D.POST_ID / 2, -6], [D.POST_OD / 2, -6],
-                   [D.POST_OD / 2, postH - 10],
-                   [D.POST_OD / 2 + 6, postH - 3], [D.POST_OD / 2 + 5, postH],
-                   [D.POST_ID / 2 + 5, postH], [D.POST_ID / 2, postH - 12],
+                   [D.POST_OD / 2, postH - D.MOUTH_LIP],
+                   [D.POST_ID / 2, postH - D.MOUTH_LIP],
                    [D.POST_ID / 2, -6]], C.post, undefined, 56));
+  // miệng rót = ĐĨA HOA ANH ĐÀO, không phải cái phễu
+  postG.add(blossomDish(postH - D.MOUTH_LIP, D.POST_ID / 2));
   for (let k = 0; k < D.LUG_N; k++) {           // vấu bayonet ở chân trụ
     const lug = new THREE.Mesh(
       new THREE.BoxGeometry(D.LUG_T, D.LUG_W, D.LUG_H), mat(C.post));
@@ -790,9 +859,11 @@ function rebuild() {
     new THREE.Vector3(D.RISER_OD / 2 + 4, 0, D.BARB_Z + 44),
     new THREE.Vector3(26, 4, 74), new THREE.Vector3(40, 3, 88),
     new THREE.Vector3(43, 0, highRimZ - 6),
-    new THREE.Vector3(48, 0, trayHighZ + 3),               // qua khấc trên mâm
-    new THREE.Vector3(60, -3, trayHighZ - 14),
-    new THREE.Vector3(78, -8, 40), new THREE.Vector3(92, -12, 11),
+    new THREE.Vector3(48.5, 0, trayHighZ + 3),             // qua khấc trên mâm
+    new THREE.Vector3(D.STEM_HUG_R, 0, highRimZ - 6),      // vòng ra ngoài vành
+    new THREE.Vector3(D.STEM_HUG_R, 0, 62),                // rồi ÁP SÁT thành ly
+    new THREE.Vector3(D.STEM_HUG_R - 1, 0, 26),
+    new THREE.Vector3(60, -5, 11), new THREE.Vector3(84, -12, 9),
   ]);
   model.add(new THREE.Mesh(new THREE.TubeGeometry(hoseCurve, 70, 2.2, 10, false), mat(C.hose)));
   if (S.stem) model.add(stemCover(hoseCurve));
@@ -925,6 +996,23 @@ function report(d) {
      + `${(glassR(D.FOOT_Z) - D.FOOT_D / 2).toFixed(0)} mm of open water all round it, where `
      + `V1's &#216;60 base sat against the wall. Seed ${D.FOOT_SEED}, locked`,
      glassR(D.FOOT_Z) - D.FOOT_D / 2 >= 12 ? "ok" : "warn"],
+
+    ["Stem hangs on the glass, hugging it",
+     `two ${D.CLIP_ARC}&deg; collars of R${D.CLIP_IN} snap onto the glass wall at `
+     + `${D.CLIP_Z.join(" and ")} mm, and the cover runs down at R${D.STEM_HUG_R} against the `
+     + `R48.2 wall. Clipping to the rim was useless - the tray already covers it`,
+     D.STEM_HUG_R - 48.2 <= 6 ? "ok" : "warn"],
+
+    ["Rim crossing is covered, and useful",
+     `a ${D.PAD_L} x ${D.PAD_W} mm pad caps the point where the hose goes over the rim - `
+     + `hides it, and gives somewhere to rest a spoon or a ring`,
+     "ok"],
+
+    ["Pour mouth is a blossom dish",
+     `five petals to R${D.MOUTH_RING + D.MOUTH_PET} with cleft tips, ${D.MOUTH_LIP} mm deep, `
+     + `instead of a plain funnel - the flower repeats at the centre, the way the reference `
+     + `set stacks a small bloom inside a big one`,
+     "ok"],
 
     ["Hose is hidden under a stem",
      `a C-section cover, &#216;${(2 * (D.STEM_IN + D.STEM_WALL)).toFixed(1)} outside with a `
