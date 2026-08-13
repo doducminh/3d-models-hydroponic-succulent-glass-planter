@@ -77,7 +77,7 @@
     <h2>The only two things left to decide</h2>
     <div class="row">
       <label>Well bore</label>
-      <input type="range" id="s-bore" min="26" max="34" step="1" value="30">
+      <input type="range" id="s-bore" min="26" max="32" step="1" value="28">
       <span class="val" id="v-bore"></span>
     </div>
     <div class="row">
@@ -157,10 +157,10 @@ const glassR = z => {
 
 // ════════════════════════ THIẾT KẾ — chốt cứng theo ly trên
 const D = {
-  N: 6,
+  N: 5,                 // năm cây
   TRAY_DIA: 104,        // gác lên vành ly Ø90, bám 11mm mỗi bên
   TRAY_Z0: 98.5,        // = tâm vành + 1
-  RING_R: 27,
+  RING_R: 28,
   WALL: 3,
 
   // ── HỐC: trục VUÔNG GÓC VỚI MÂM, tức nghiêng 21.3° theo miệng ly.
@@ -178,11 +178,12 @@ const D = {
 
   // ── đường khí luồn QUA MIỆNG LY, không xuyên thành
   HOSE_NOTCH_W: 9,
+  PHASE: Math.PI / 5,   // hốc lệch nửa bước -> 0° trống cho khấc luồn dây
 
   // ── TRỤ PHÂN PHỐI: mảnh hết mức, chỉ vừa đủ ôm ống nâng + đường rót tay
   POST_OD: 18, POST_ID: 14,
   RISER_OD: 11, RISER_ID: 7,
-  PORT_D: 4, PORT_N: 6,
+  PORT_D: 4, DUCT_WALL: 1.6,
   POST_TOP: 118,
   FOOT_Z: 4, FUNNEL_H: 12, FUNNEL_D: 26,
   BARB_D: 5, BARB_LEN: 9, BARB_Z: 16,
@@ -201,7 +202,7 @@ const D = {
   FIT_SLIDE: 0.30,      // P.clearance("sliding")— ống nâng rút ra rửa
 };
 
-const S = { bore: 30, water: 74, glass: true, plants: true, view: "whole", explode: false };
+const S = { bore: 28, water: 74, glass: true, plants: true, view: "whole", explode: false };
 
 const stage = document.getElementById("stage");
 const errEl = document.getElementById("err");
@@ -269,10 +270,10 @@ function petalPts(rBase, seg = 260) {
   const out = [], gripA = D.GRIP_AT * Math.PI / 180;
   for (let i = 0; i < seg; i++) {
     const a = 2 * Math.PI * i / seg;
-    let r = rBase + D.PETAL_A * Math.cos(D.N * a);
-    // khấc luồn dây khí ở phía THẤP (180°)
+    let r = rBase + D.PETAL_A * Math.cos(D.N * (a - D.PHASE));
+    // khấc luồn dây khí ở phía CAO (0°) — tức MẶT SAU, khuất khỏi hướng nhìn
     {
-      const gx = -rBase, gy = 0;
+      const gx = rBase, gy = 0;
       const dh = Math.hypot(r * Math.cos(a) - gx, r * Math.sin(a) - gy);
       if (dh < D.HOSE_NOTCH_W) r -= (D.HOSE_NOTCH_W - dh) * 0.95;
     }
@@ -318,7 +319,7 @@ function derive() {
   const br = boreR();
   const wells = [];
   for (let k = 0; k < D.N; k++) {
-    const a = 2 * Math.PI * k / D.N;
+    const a = D.PHASE + 2 * Math.PI * k / D.N;
     const lx = D.RING_R * Math.cos(a), ly = D.RING_R * Math.sin(a);
     // cao độ THẬT của mặt mâm ngay trên hốc này
     const topZ = D.TRAY_Z0 + lx * t;
@@ -416,16 +417,22 @@ function rebuild() {
 
   // từng hốc: ống nghiêng theo mâm + VÀNH NGỒI + LÒNG MUỖNG
   for (const w of d.wells) {
+    // Biên dạng ĐẦY ĐỦ, có thành dày thật và LỖ XUYÊN đáy cho ống rễ.
+    const rh = D.ROOT_HOLE / 2;
     const well = lathe([
-      [d.br, 0], [d.br, -D.SEAT_DROP],
-      [D.SEAT_BORE / 2, -D.SEAT_DROP],                    // vành cho bầu rễ ngồi
+      [d.br + D.WALL, 0],                                  // mép ngoài, ngang mặt mâm
+      [d.br + D.WALL, -deep - D.WALL],                     // thành ngoài xuống đáy
+      [rh, -deep - D.WALL],                                // ⚠️ MẶT DƯỚI, hở tới lỗ rễ
+      [rh, -deep + D.CHIMNEY_H],                           // lòng ống rễ đi lên
+      [rh + 2, -deep + D.CHIMNEY_H],                       // vành ống rễ
+      [rh + 2, -deep],
+      [d.br * 0.5, -deep], [d.br * 0.88, -deep + 2.5],     // lòng muỗng
+      [d.br, -D.SEAT_DROP - D.WELL_DEPTH],                 // miệng muỗng
       [D.SEAT_BORE / 2, -D.SEAT_DROP - D.WELL_DEPTH],
-      [d.br, -D.SEAT_DROP - D.WELL_DEPTH],                // miệng muỗng
-      [d.br * 0.86, -deep + 3], [d.br * 0.45, -deep],
-      [0, -deep],                                          // đáy muỗng
-      [0, -deep - D.WALL], [d.br + D.WALL, -deep - D.WALL],
-      [d.br + D.WALL, 0], [d.br, 0],
-    ], C.tray, undefined, 56);
+      [D.SEAT_BORE / 2, -D.SEAT_DROP],                     // vành đỡ bầu rễ
+      [d.br, -D.SEAT_DROP],
+      [d.br, 0], [d.br + D.WALL, 0],
+    ], C.tray, undefined, 64);
     well.position.set(w.lx, w.ly, 0);
     body.add(well);
   }
@@ -450,6 +457,13 @@ function rebuild() {
   }
   model.add(postG);
 
+  // bệ quanh chân trụ — chỗ sáu ống cấp đâm vào, đúc liền với mâm
+  body.add(lathe([[D.POST_OD / 2 + D.FIT_SNUG, -D.WALL],
+                  [D.POST_OD / 2 + 7, -D.WALL],
+                  [D.POST_OD / 2 + 5, -D.WALL - 6],
+                  [D.POST_OD / 2 + D.FIT_SNUG, -D.WALL - 6],
+                  [D.POST_OD / 2 + D.FIT_SNUG, -D.WALL]], C.tray, undefined, 48));
+
   // ổ bayonet trên mâm — vành có ba rãnh, trụ thả vào rồi xoay khoá
   body.add(lathe([[D.POST_OD / 2 + D.FIT_SNUG, -D.WALL - 5],
                   [D.POST_OD / 2 + D.FIT_SNUG + 2.5, -D.WALL - 5],
@@ -460,16 +474,6 @@ function rebuild() {
   // ══ ỐNG RỄ + NƯỚC ĐỌNG: nước chỉ ngập tới vành ống rễ, phần dư tụt xuống ly.
   // Rễ muốn thêm nước thì tự chui qua ống này vươn xuống bể dưới.
   for (const w of d.wells) {
-    const ch = new THREE.Group();
-    ch.rotation.y = -G.TILT * Math.PI / 180;
-    ch.position.z = D.TRAY_Z0;
-    const zLocal = -(D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH);
-    ch.add(lathe([[D.ROOT_HOLE / 2, 0], [D.ROOT_HOLE / 2 + 2, 0],
-                  [D.ROOT_HOLE / 2 + 2, D.CHIMNEY_H], [D.ROOT_HOLE / 2, D.CHIMNEY_H],
-                  [D.ROOT_HOLE / 2, 0]], C.tray, undefined, 32)
-           .translateX(w.lx).translateY(w.ly).translateZ(zLocal));
-    model.add(ch);
-
     const rows = [];
     for (let i = 0; i <= 40; i++) {
       const a = 2 * Math.PI * i / 40, c = Math.cos(a), s = Math.sin(a), r = d.br - 1;
@@ -492,7 +496,8 @@ function rebuild() {
                                  Math.sin(a) * (Math.hypot(wx, w.ly) - d.br + 4), w.inletZ);
     const v = new THREE.Vector3().subVectors(p2, p1);
     const duct = new THREE.Mesh(
-      new THREE.CylinderGeometry(D.PORT_D / 2, D.PORT_D / 2, v.length(), 14), mat(C.tray));
+      new THREE.CylinderGeometry(D.PORT_D / 2 + D.DUCT_WALL, D.PORT_D / 2 + D.DUCT_WALL,
+                                 v.length(), 18), mat(C.tray));
     duct.position.copy(p1).addScaledVector(v, 0.5);
     duct.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.clone().normalize());
     model.add(duct);
@@ -510,22 +515,25 @@ function rebuild() {
   const barb = new THREE.Mesh(
     new THREE.CylinderGeometry(D.BARB_D / 2, D.BARB_D / 2 + 0.8, D.BARB_LEN, 20), mat(C.tube));
   barb.geometry.rotateZ(Math.PI / 2);
-  barb.geometry.translate(-(D.RISER_OD / 2 + D.BARB_LEN / 2), 0, 0);
+  barb.geometry.translate(D.RISER_OD / 2 + D.BARB_LEN / 2, 0, 0);
   barb.position.z = D.BARB_Z;
   riserG.add(barb);
   // Dây khí: từ cút, đi TRONG lòng ly lên phía THẤP của vành, luồn qua khấc
   // trên mâm rồi mới ra ngoài. Không xuyên qua thành ly.
-  const lowRimZ = G.RIM_MID - G.MOUTH_R * t;              // điểm thấp nhất của vành
+  // Dây khí đi lên phía CAO của vành (mặt sau), qua khấc trên mâm rồi ra ngoài.
+  // Phía thấp là mặt người xem nhìn vào — không để máy móc ở đó.
+  const highRimZ = G.RIM_MID + G.MOUTH_R * t;
+  const trayHighZ = D.TRAY_Z0 + (D.TRAY_DIA / 2) * t;
   model.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-(D.RISER_OD / 2 + D.BARB_LEN), 0, D.BARB_Z),
-    new THREE.Vector3(-30, 6, 30), new THREE.Vector3(-40, 4, 60),
-    new THREE.Vector3(-43, 0, lowRimZ - 4),
-    new THREE.Vector3(-50, 0, lowRimZ + 3),                // qua khấc trên mâm
-    new THREE.Vector3(-62, -4, lowRimZ - 6),
-    new THREE.Vector3(-78, -10, 34), new THREE.Vector3(-92, -14, 11),
+    new THREE.Vector3(D.RISER_OD / 2 + D.BARB_LEN, 0, D.BARB_Z),
+    new THREE.Vector3(30, 5, 34), new THREE.Vector3(40, 3, 70),
+    new THREE.Vector3(43, 0, highRimZ - 6),
+    new THREE.Vector3(48, 0, trayHighZ + 3),               // qua khấc trên mâm
+    new THREE.Vector3(60, -3, trayHighZ - 14),
+    new THREE.Vector3(78, -8, 40), new THREE.Vector3(92, -12, 11),
   ]), 70, 2.2, 10, false), mat(C.hose)));
   const pump = new THREE.Mesh(new THREE.BoxGeometry(28, 22, 20), mat(C.pump));
-  pump.position.set(-112, -14, 10);
+  pump.position.set(112, -12, 10);
   model.add(pump);
 
   // ══ CÂY: bầu rễ ngồi trên vành, rễ thò xuống muỗng, lá NGHIÊNG theo mâm
@@ -626,11 +634,21 @@ function report(d) {
      + `instead of the glass backing up into it`,
      d.aboveReservoir >= 2.5 ? "ok" : "bad"],
 
-    ["Wells run into one another",
-     d.merged ? `neck ${d.neck.toFixed(1)} mm - water passes spoon to spoon down the slope`
-              : `${d.pitch.toFixed(1)} mm apart, bore &#216;${S.bore} - separate pockets, each `
-              + `needs its own feed`,
-     d.merged ? "ok" : "warn"],
+    ["Five separate wells, each plumbed on its own",
+     `${d.pitch.toFixed(1)} mm centre to centre with a &#216;${S.bore} bore - `
+     + `${d.boreGap.toFixed(1)} mm of solid between them. They no longer need to run into `
+     + `one another: every well has its own feed duct and its own root chimney`,
+     d.boreGap >= 3 ? "ok" : "warn"],
+
+    ["The drain hole is really there",
+     `&#216;${D.ROOT_HOLE} opening straight through the underside of every spoon - not a `
+     + `ring drawn on a solid floor`,
+     "ok"],
+
+    ["Pump and hose sit behind",
+     `the notch is at the high side of the rim, so the tubing and the pump are on the far `
+     + `side from the low edge you look into`,
+     "ok"],
 
     ["Body clears the glass",
      `&#216;${(2 * d.planR).toFixed(0)} against glass &#216;`
@@ -649,9 +667,9 @@ function report(d) {
      "ok"],
 
     ["Air hose comes in over the rim",
-     `the hose runs up inside the glass to the low side of the mouth, through a `
-     + `${D.HOSE_NOTCH_W} mm notch in the tray, then out to the pump - it never crosses the `
-     + `glass wall`,
+     `the hose runs up inside the glass to the HIGH side of the mouth, through a `
+     + `${D.HOSE_NOTCH_W} mm notch in the tray, then out and down behind - it never crosses `
+     + `the glass wall`,
      "ok"],
 
     ["Lifts out in one piece for a water change",
@@ -671,8 +689,8 @@ function report(d) {
      "ok"],
 
     ["Shape reads as a flower, not a fixture",
-     `${D.N} scalloped petals on the rim, one over each well; the spoons make the same `
-     + `pattern again from above, and the pour funnel opens like a bud`,
+     `${D.N} scalloped petals on the rim, one over each well; the spoons repeat the same `
+     + `pattern below, and the pour funnel opens like a bud`,
      "ok"],
 
     ["Fits the bed, plastic is sane",
