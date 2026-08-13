@@ -173,8 +173,19 @@ const D = {
   // ── ỐNG RỄ: lỗ giữa đáy muỗng, thông thẳng xuống ly.
   //    Vành ống cao hơn sàn muỗng nên vẫn đọng lại chút nước; rễ muốn thêm
   //    nước thì tự chui qua đây vươn xuống bể dưới.
-  CHIMNEY_H: 4,         // ⚠️ vành ống = mực nước giữ lại
+  // ⚠️ Chiều cao vành ống rễ KHÔNG đặt tay — suy ra từ khe an toàn dưới đây.
+  //    Vành cao bao nhiêu thì mặt nước dâng lên bấy nhiêu; dâng quá là chạm lá.
+  CROWN_GAP: 3,         // ⚠️ mặt nước phải thấp hơn đáy bầu rễ ít nhất bấy nhiêu
   ROOT_HOLE: 10,        // đủ rộng cho chùm rễ đi qua
+
+  // ── CHÂN ĐẾ: kế thừa đế lưới V1 nhưng THU NHỎ, chừa chỗ cho cá bơi quanh
+  FOOT_D: 48,           // V1 là Ø60 sát thành ly; giờ hẹp lại lấy chỗ bơi
+  FOOT_H: 24,
+  FOOT_BAYS: 6,         // số cửa cho cá chui qua
+  FOOT_STRUT: 26,       // bề rộng mỗi nan, tính bằng độ
+
+  // ── GỜ MÓC DÂY trên ống nâng, giữ dây khí khỏi lơ lửng
+  CLIP_N: 3, CLIP_R: 3.4,
 
   // ── đường khí luồn QUA MIỆNG LY, không xuyên thành
   HOSE_NOTCH_W: 9,
@@ -317,6 +328,8 @@ function trayEdgeR(th) {
 // đi 21.3°. Nhờ vậy hốc và muỗng chỉ là lathe thường, không phải bẻ từng cái.
 function derive() {
   const br = boreR();
+  // vành ống rễ = phần sàn muỗng nằm dưới mặt nước
+  const chimneyH = D.WELL_DEPTH + D.SPOON_DEPTH - D.CROWN_GAP;
   const wells = [];
   for (let k = 0; k < D.N; k++) {
     const a = D.PHASE + 2 * Math.PI * k / D.N;
@@ -327,7 +340,7 @@ function derive() {
                  seatZ:  topZ - D.SEAT_DROP,
                  rimZ:   topZ - D.SEAT_DROP - D.WELL_DEPTH,
                  floorZ: topZ - D.SEAT_DROP - D.WELL_DEPTH - D.SPOON_DEPTH,
-                 keepZ:  topZ - D.SEAT_DROP - D.WELL_DEPTH - D.SPOON_DEPTH + D.CHIMNEY_H,
+                 keepZ:  topZ - D.SEAT_DROP - D.WELL_DEPTH - D.SPOON_DEPTH + chimneyH,
                  inletZ: topZ - D.SEAT_DROP - D.WELL_DEPTH - D.SPOON_DEPTH + 2 });
   }
   const sorted = wells.slice().sort((x, y) => y.rimZ - x.rimZ);
@@ -348,6 +361,7 @@ function derive() {
 
   return {
     br, wells, top, low, pitch, merged, neck, postGap, portZ, riserZ,
+    chimneyH,
     lift: riserZ - S.water, tubeLen, submergeRatio: submerged / tubeLen,
     maxAirZ: D.FOOT_Z + (S.water - D.FOOT_Z) / D.SUBMERGE_MIN,
     airReach: wells.filter(w => w.inletZ <= D.FOOT_Z + (S.water - D.FOOT_Z) / D.SUBMERGE_MIN).length,
@@ -355,10 +369,10 @@ function derive() {
     // rễ tính từ chỗ bầu rễ ngồi, nước bắt đầu ở miệng muỗng
     rootShortDrop: D.ROOT_MIN, waterStartDrop: D.WELL_DEPTH,
     // rễ đi từ chỗ bầu ngồi xuống, xuyên qua lớp nước đọng rồi qua ống rễ
-    waterBand: [D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH - D.CHIMNEY_H,
+    waterBand: [D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH - chimneyH,
                 D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH],
     shortRootInWater: Math.min(D.ROOT_MIN, D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH)
-                      - (D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH - D.CHIMNEY_H)
+                      - (D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH - chimneyH)
                       + (D.ROOT_MIN - D.SEAT_DROP),
     lowFloorAboveRes: 0,
     planR: D.RING_R + br,
@@ -418,13 +432,13 @@ function rebuild() {
   // từng hốc: ống nghiêng theo mâm + VÀNH NGỒI + LÒNG MUỖNG
   for (const w of d.wells) {
     // Biên dạng ĐẦY ĐỦ, có thành dày thật và LỖ XUYÊN đáy cho ống rễ.
-    const rh = D.ROOT_HOLE / 2;
+    const rh = D.ROOT_HOLE / 2, chimneyH = d.chimneyH;
     const well = lathe([
       [d.br + D.WALL, 0],                                  // mép ngoài, ngang mặt mâm
       [d.br + D.WALL, -deep - D.WALL],                     // thành ngoài xuống đáy
       [rh, -deep - D.WALL],                                // ⚠️ MẶT DƯỚI, hở tới lỗ rễ
-      [rh, -deep + D.CHIMNEY_H],                           // lòng ống rễ đi lên
-      [rh + 2, -deep + D.CHIMNEY_H],                       // vành ống rễ
+      [rh, -deep + chimneyH],                           // lòng ống rễ đi lên
+      [rh + 2, -deep + chimneyH],                       // vành ống rễ
       [rh + 2, -deep],
       [d.br * 0.5, -deep], [d.br * 0.88, -deep + 2.5],     // lòng muỗng
       [d.br, -D.SEAT_DROP - D.WELL_DEPTH],                 // miệng muỗng
@@ -507,10 +521,30 @@ function rebuild() {
   // ══ ỐNG NÂNG — CHI TIẾT RỜI, rút thẳng lên khỏi lòng trụ để cọ rửa
   const riserG = new THREE.Group();
   riserG.position.z = S.explode ? 108 : 0;
-  riserG.add(lathe([[D.FUNNEL_D / 2, 0], [D.RISER_OD / 2, D.FUNNEL_H],
-                    [D.RISER_ID / 2, D.FUNNEL_H], [D.FUNNEL_D / 2 - 2, 0.5],
-                    [D.FUNNEL_D / 2, 0]], C.tube, undefined, 48).translateZ(D.FOOT_Z));
-  riserG.add(tube(D.RISER_OD / 2, D.FOOT_Z + D.FUNNEL_H, d.riserZ, C.tube));
+  // Chân đế côn có CỬA CHO CÁ: dựng thành từng nan, chừa khoảng hở giữa các nan.
+  // Kế thừa dáng đế lưới V1 nhưng Ø48 thay vì Ø60 — cá có chỗ bơi quanh.
+  const bayStep = 2 * Math.PI / D.FOOT_BAYS, strut = D.FOOT_STRUT * Math.PI / 180;
+  for (let k = 0; k < D.FOOT_BAYS; k++) {
+    const a0 = k * bayStep, rows = [];
+    for (let i = 0; i <= 12; i++) {
+      const a = a0 + strut * i / 12, c = Math.cos(a), s = Math.sin(a);
+      const rB = D.FOOT_D / 2, rT = D.RISER_OD / 2 + 3;
+      rows.push([[rB * c, rB * s, D.FOOT_Z], [rB * c, rB * s, D.FOOT_Z + 3],
+                 [rT * c, rT * s, D.FOOT_Z + D.FOOT_H],
+                 [rT * c, rT * s, D.FOOT_Z + D.FOOT_H + 2]]);
+    }
+    riserG.add(strip(rows, C.tube));
+  }
+  // vành chân và vành cổ, nối các nan lại
+  riserG.add(lathe([[D.FOOT_D / 2 - 3, D.FOOT_Z], [D.FOOT_D / 2, D.FOOT_Z],
+                    [D.FOOT_D / 2, D.FOOT_Z + 3], [D.FOOT_D / 2 - 3, D.FOOT_Z + 3],
+                    [D.FOOT_D / 2 - 3, D.FOOT_Z]], C.tube, undefined, 56));
+  riserG.add(lathe([[D.RISER_OD / 2, D.FOOT_Z + D.FOOT_H],
+                    [D.RISER_OD / 2 + 3, D.FOOT_Z + D.FOOT_H],
+                    [D.RISER_OD / 2 + 3, D.FOOT_Z + D.FOOT_H + 2],
+                    [D.RISER_OD / 2, D.FOOT_Z + D.FOOT_H + 2],
+                    [D.RISER_OD / 2, D.FOOT_Z + D.FOOT_H]], C.tube, undefined, 40));
+  riserG.add(tube(D.RISER_OD / 2, D.FOOT_Z, d.riserZ, C.tube));
   model.add(riserG);
   const barb = new THREE.Mesh(
     new THREE.CylinderGeometry(D.BARB_D / 2, D.BARB_D / 2 + 0.8, D.BARB_LEN, 20), mat(C.tube));
@@ -518,6 +552,17 @@ function rebuild() {
   barb.geometry.translate(D.RISER_OD / 2 + D.BARB_LEN / 2, 0, 0);
   barb.position.z = D.BARB_Z;
   riserG.add(barb);
+
+  // gờ móc dây: móc chữ C ôm lấy dây khí, để dây chạy dọc ống chứ không lơ lửng
+  for (let k = 0; k < D.CLIP_N; k++) {
+    const zc = D.BARB_Z + 12 + k * 16;
+    const clip = new THREE.Mesh(
+      new THREE.TorusGeometry(D.CLIP_R, 1.3, 8, 22, Math.PI * 1.45), mat(C.tube));
+    clip.geometry.rotateY(Math.PI / 2);
+    clip.position.set(D.RISER_OD / 2 + D.CLIP_R - 0.6, 0, zc);
+    clip.rotation.z = -0.35;
+    riserG.add(clip);
+  }
   // Dây khí: từ cút, đi TRONG lòng ly lên phía THẤP của vành, luồn qua khấc
   // trên mâm rồi mới ra ngoài. Không xuyên qua thành ly.
   // Dây khí đi lên phía CAO của vành (mặt sau), qua khấc trên mâm rồi ra ngoài.
@@ -526,7 +571,9 @@ function rebuild() {
   const trayHighZ = D.TRAY_Z0 + (D.TRAY_DIA / 2) * t;
   model.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
     new THREE.Vector3(D.RISER_OD / 2 + D.BARB_LEN, 0, D.BARB_Z),
-    new THREE.Vector3(30, 5, 34), new THREE.Vector3(40, 3, 70),
+    new THREE.Vector3(D.RISER_OD / 2 + 4, 0, D.BARB_Z + 12),   // cài vào gờ móc
+    new THREE.Vector3(D.RISER_OD / 2 + 4, 0, D.BARB_Z + 44),
+    new THREE.Vector3(26, 4, 74), new THREE.Vector3(40, 3, 88),
     new THREE.Vector3(43, 0, highRimZ - 6),
     new THREE.Vector3(48, 0, trayHighZ + 3),               // qua khấc trên mâm
     new THREE.Vector3(60, -3, trayHighZ - 14),
@@ -583,9 +630,9 @@ function report(d) {
      "ok"],
 
     ["Spoon holds a little water, and no more",
-     `the root chimney rim stands ${D.CHIMNEY_H} mm off the spoon floor, so that is exactly `
+     `the root chimney rim stands ${d.chimneyH} mm off the spoon floor, so that is exactly `
      + `how deep the puddle gets - anything above it goes straight down the hole`,
-     D.CHIMNEY_H >= 3 && D.CHIMNEY_H <= 8 ? "ok" : "warn"],
+     d.chimneyH >= 3 && d.chimneyH <= 8 ? "ok" : "warn"],
 
     ["Roots can grow on down into the glass",
      `&#216;${D.ROOT_HOLE} chimney through each spoon floor; a plant that wants more water `
@@ -639,6 +686,25 @@ function report(d) {
      + `${d.boreGap.toFixed(1)} mm of solid between them. They no longer need to run into `
      + `one another: every well has its own feed duct and its own root chimney`,
      d.boreGap >= 3 ? "ok" : "warn"],
+
+    ["Water can never reach the leaves",
+     `the chimney rim is set from the safety gap, not typed in: water sits `
+     + `${D.CROWN_GAP} mm below the root ball, and the &#216;${D.ROOT_HOLE} chimney drains `
+     + `${(Math.PI * (D.ROOT_HOLE / 2) ** 2 / (Math.PI * (D.PORT_D / 2) ** 2)).toFixed(0)}x `
+     + `faster than one feed duct fills, so the level cannot climb`,
+     D.CROWN_GAP >= 2 && D.ROOT_HOLE >= 2.5 * D.PORT_D ? "ok" : "warn"],
+
+    ["Foot leaves room for fish",
+     `&#216;${D.FOOT_D} foot inside a &#216;${(2 * glassR(D.FOOT_Z)).toFixed(0)} glass floor - `
+     + `${(glassR(D.FOOT_Z) - D.FOOT_D / 2).toFixed(0)} mm of swimming space all round, and `
+     + `${D.FOOT_BAYS} bays through the skirt to swim into. V1's base was &#216;60 and left `
+     + `almost none`,
+     glassR(D.FOOT_Z) - D.FOOT_D / 2 >= 12 ? "ok" : "warn"],
+
+    ["Air hose is clipped, not dangling",
+     `${D.CLIP_N} C-clips up the riser hold the hose against the tube; a slack loop in mid `
+     + `water snags and looks like a mess`,
+     "ok"],
 
     ["The drain hole is really there",
      `&#216;${D.ROOT_HOLE} opening straight through the underside of every spoon - not a `
