@@ -169,7 +169,12 @@ const D = {
   SEAT_DROP: 4,         // bầu rễ ngồi ở đây, tính từ mặt mâm
   WELL_DEPTH: 2,        // từ chỗ ngồi xuống miệng muỗng
   SPOON_DEPTH: 5,       // ⚠️ lòng muỗng NÔNG — chỉ đọng chút nước
-  SEAT_BORE: 22,        // lỗ dưới chỗ ngồi; bầu rễ Ø30 tì lên vành này
+  SEAT_BORE: 22,
+
+  // ── GỜ TÌ LÁ: vòng u nổi quanh miệng hốc, hoa thị ngồi lên đó.
+  //    Vai đỡ Ø22 KHÔNG giữ được bầu rễ Ø20 — cây tụt thẳng xuống. Phải đỡ
+  //    bằng lá, và bề mặt đỡ phải TÙ, nhọn là xước lá sen đá.
+  RIB_N: 6, RIB_D: 5.5, RIB_H: 3, RIB_RING: 15.5,
 
   // ── ỐNG RỄ: lỗ giữa đáy muỗng, thông thẳng xuống ly.
   //    Vành ống cao hơn sàn muỗng nên vẫn đọng lại chút nước; rễ muốn thêm
@@ -758,6 +763,23 @@ function rebuild() {
     ], C.tray, undefined, 64);
     well.position.set(w.lx, w.ly, 0);
     body.add(well);
+
+    // gờ tì lá: chỏm cầu đáy phẳng, mọi lớp nhỏ dần khi lên cao -> in được,
+    // và không có cạnh nào sắc để cứa vào lá.
+    const dome = [[0, D.RIB_H]];
+    for (let k = 1; k <= 8; k++) {
+      const u = k / 8;
+      dome.push([D.RIB_D / 2 * Math.sin(u * Math.PI / 2),
+                 D.RIB_H * Math.cos(u * Math.PI / 2)]);
+    }
+    dome.push([0, 0], [0, D.RIB_H]);
+    for (let k = 0; k < D.RIB_N; k++) {
+      const a = 2 * Math.PI * k / D.RIB_N + Math.PI / D.RIB_N;
+      const rib = lathe(dome, C.tray, undefined, 28);
+      rib.position.set(w.lx + D.RIB_RING * Math.cos(a),
+                       w.ly + D.RIB_RING * Math.sin(a), 0);
+      body.add(rib);
+    }
   }
 
   // ══ TRỤ PHÂN PHỐI — CHI TIẾT RỜI, khoá bayonet vào mâm, xoay 1/4 vòng là ra
@@ -900,7 +922,7 @@ function rebuild() {
       g.position.z = D.TRAY_Z0;
       const ball = lathe([[0, 0], [D.SEAT_BORE / 2 + 1, 1.5], [d.br - 0.5, 7],
                           [0, 10], [0, 0]], C.ball, undefined, 24);
-      ball.position.set(w.lx, w.ly, -D.SEAT_DROP);
+      ball.position.set(w.lx, w.ly, -D.SEAT_DROP);   // bầu rễ vẫn thõng trong hốc
       g.add(ball);
       for (let j = 0; j < 5; j++) {
         const rt = lathe([[0, 0], [0.8, 0], [0.8, D.ROOT_LEN], [0, D.ROOT_LEN], [0, 0]],
@@ -911,7 +933,7 @@ function rebuild() {
       }
       const ros = lathe([[0, 0], [d.br + 5, 5], [d.br + 1, 9], [0, 10], [0, 0]],
                         C.leaf, undefined, 28);
-      ros.position.set(w.lx, w.ly, -D.SEAT_DROP + 10);
+      ros.position.set(w.lx, w.ly, D.RIB_H);        // hoa thị TÌ LÊN GỜ
       g.add(ros);
       model.add(g);
     }
@@ -948,6 +970,18 @@ function report(d) {
      + `${(D.SEAT_DROP + D.ROOT_LEN).toFixed(0)} mm below the rim - past the spoon and out `
      + `through the &#216;${D.ROOT_HOLE} chimney into the glass`,
      D.SEAT_DROP + D.ROOT_LEN > D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH ? "ok" : "warn"],
+
+    ["Plant rests on ribs, not down the hole",
+     `${D.RIB_N} blunt domes &#216;${D.RIB_D} x ${D.RIB_H} mm tall on a R${D.RIB_RING} ring `
+     + `round each mouth. The rosette sits on those; the &#216;${D.ROOT_W} root ball drops `
+     + `clean through below. Without them the plant sinks - the &#216;${D.SEAT_BORE} shoulder `
+     + `is wider than the ball and never catches it`,
+     D.SEAT_BORE > D.ROOT_W && 2 * D.RIB_RING < d.pitch - 1 ? "ok" : "warn"],
+
+    ["Ribs are blunt, and clear their neighbours",
+     `spherical caps - no edge anywhere, because a sharp rib scores succulent leaves. Rings `
+     + `on neighbouring wells stay ${(d.pitch - 2 * D.RIB_RING).toFixed(1)} mm apart`,
+     d.pitch - 2 * D.RIB_RING >= 1 ? "ok" : "bad"],
 
     ["This is where the water actually sits",
      `a ring ${d.ringW.toFixed(1)} mm wide and ${d.chimneyH} mm deep between the chimney wall `
