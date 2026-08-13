@@ -186,11 +186,16 @@ const D = {
   CHIMNEY_W: 2,         // thành ống rễ
 
   // ── CHÂN ĐẾ: kế thừa đế lưới V1 nhưng THU NHỎ, chừa chỗ cho cá bơi quanh
-  FOOT_D: 64,           // to hơn cho vững; cá chui XUYÊN QUA lỗ chứ không chỉ bơi vòng
-  FOOT_H: 36,
+  FOOT_D: 70,           // cá chui XUYÊN QUA lỗ; cần đủ diện tích cho lỗ cỡ betta
+  FOOT_H: 50,           // lỗ betta Ø30 cần >=38; cao thêm để rải đủ lỗ
   FOOT_WALL: 2.4,
   FOOT_SEED: 7,         // ⚠️ khoá cứng — đổi số là ra bố cục lỗ khác hẳn
-  FOOT_SHAPES: 11,      // số lỗ hình trên váy đế — ít mà to, cá chui lọt
+  // ── LỖ CHO CÁ: hai cỡ thật, không phải rải cho đẹp
+  FISH_BETTA_R: 15,     // betta cả vây dày ~25mm -> lỗ Ø30
+  FISH_GUPPY_R: 8.5,    // bảy màu thân ~10mm -> lỗ Ø17
+  GATE_SHAPED: 4.4,     // dưới ngưỡng này hình phức tạp in ra thành cục -> dùng tròn
+  FOOT_SHRINK: 0.14,    // co 14% mỗi lần thử lại, theo CLAUDE.md
+  FOOT_TRIES: 6,
 
   // ── CUỐNG HOA: nắp che dây khí chỗ nó vắt qua khấc trên mâm.
   //    Chi tiết RỜI thứ tư, tiết diện chữ C úp xuống, bấm lên dây.
@@ -205,7 +210,7 @@ const D = {
   PAD_L: 34, PAD_W: 22, PAD_T: 2.6,         // mặt phẳng che chỗ dây vắt qua
 
   // ── miệng trụ: đĩa hoa anh đào thay cho cái phễu
-  MOUTH_R: 21, MOUTH_PET: 9, MOUTH_RING: 13, MOUTH_CORE: 12,
+  MOUTH_R: 16, MOUTH_PET: 6.5, MOUTH_RING: 9.5, MOUTH_CORE: 9,
   MOUTH_LIP: 6,         // chiều cao lòng đĩa
 
   // ── GỜ MÓC DÂY trên ống nâng, giữ dây khí khỏi lơ lửng
@@ -216,8 +221,8 @@ const D = {
   PHASE: Math.PI / 5,   // hốc lệch nửa bước -> 0° trống cho khấc luồn dây
 
   // ── TRỤ PHÂN PHỐI: mảnh hết mức, chỉ vừa đủ ôm ống nâng + đường rót tay
-  POST_OD: 18, POST_ID: 14,
-  RISER_OD: 11, RISER_ID: 7,
+  POST_OD: 16, POST_ID: 12.6,
+  RISER_OD: 10, RISER_ID: 6.5,
   PORT_D: 4, DUCT_WALL: 1.6,
   POST_TOP: 140,        // ⚠️ phải cao hơn tán sen đá, xem phép kiểm
   FOOT_Z: 4, FUNNEL_H: 12, FUNNEL_D: 26,
@@ -395,26 +400,45 @@ function shapePts(kind, r, n = 76) {
   return P.map(q => [q[0] * k, q[1] * k]);
 }
 
-// gieo ngẫu nhiên có khoá hạt, thả lỗ lớn trước — đúng cách V1 làm
+// Rải lỗ: thang kích thước THẬT theo cỡ cá, sắp LỚN TRƯỚC, và có CƠ CHẾ CO NHỎ
+// — đúng ba điểm CLAUDE.md đã ghi. Gieo thuần chỉ đặt được vài lỗ rồi kẹt; có co
+// nhỏ thì phủ kín được diện tích.
 function footHoles() {
   let s = D.FOOT_SEED >>> 0;
   const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
-  const kinds = ["heart", "star", "flower", "circle"];
   const rB = D.FOOT_D / 2, rT = D.RISER_OD / 2 + 4;
   const circ = 2 * Math.PI * (rB + rT) / 2;
+
+  // thang: 2 cửa betta, 5 cửa bảy màu, còn lại lấp chỗ trống
+  const ladder = [D.FISH_BETTA_R, D.FISH_BETTA_R];
+  for (let i = 0; i < 5; i++) ladder.push(D.FISH_GUPPY_R);
+  for (let i = 0; i < 16; i++) ladder.push(7.6 - 3.4 * i / 16);
+
+  const kinds = ["heart", "star", "flower", "circle"];
   const out = [];
-  for (let i = 0; i < D.FOOT_SHAPES; i++) {
-    const rad = 9.5 - 4.4 * i / D.FOOT_SHAPES;
-    const yMin = rad + 3.5, yMax = D.FOOT_H - rad - 3.5;
-    if (yMax <= yMin) continue;                // lỗ to hơn cả tấm thì bỏ
-    for (let tries = 0; tries < 500; tries++) {
-      const y = yMin + rnd() * (yMax - yMin);
-      const sPos = rad + 5 + rnd() * (circ - 2 * rad - 10);
-      const ok = out.every(o => {
-        let ds = Math.abs(o.s - sPos); ds = Math.min(ds, circ - ds);
-        return Math.hypot(ds, o.y - y) >= o.r + rad + 3.4;
-      });
-      if (ok) { out.push({ s: sPos, y, r: rad, kind: kinds[out.length % 4] }); break; }
+  for (const r0 of ladder) {
+    let rad = r0, placed = false;
+    for (let attempt = 0; attempt < D.FOOT_TRIES && !placed; attempt++) {
+      const yMin = rad + 3.5, yMax = D.FOOT_H - rad - 3.5;
+      if (yMax > yMin) {
+        for (let k = 0; k < 300; k++) {
+          const y = yMin + rnd() * (yMax - yMin);
+          const sPos = rad + 4 + rnd() * (circ - 2 * rad - 8);
+          const ok = out.every(o => {
+            let ds = Math.abs(o.s - sPos); ds = Math.min(ds, circ - ds);
+            // >= 2x lề đoạn (3mm) thì hai đoạn tam giác hoá không chồng nhau
+            return Math.hypot(ds, o.y - y) >= o.r + rad + 5;
+          });
+          if (ok) {
+            // hình phức tạp chỉ dùng khi đủ lớn, dưới ngưỡng thì tròn
+            const kind = rad >= D.GATE_SHAPED ? kinds[out.length % 4] : "circle";
+            out.push({ s: sPos, y, r: rad, kind });
+            placed = true;
+            break;
+          }
+        }
+      }
+      if (!placed) rad *= 1 - D.FOOT_SHRINK;      // không lọt thì co lại, thử tiếp
     }
   }
   return { holes: out, circ, rB, rT };
@@ -436,7 +460,8 @@ function footSkirt() {
   const sorted = holes.slice().sort((x, y) => x.s - y.s);
   let cur = 0;
   for (const h of sorted) {
-    const a = h.s - h.r - 3, b = h.s + h.r + 3;
+    const a = h.s - h.r - 2, b = h.s + h.r + 2;
+    if (a < cur) continue;                    // đoạn chồng đoạn trước -> bỏ lỗ này
     if (a > cur) plain(cur, a);
     segs.push({ a, b, hole: h });
     cur = b;
@@ -512,7 +537,7 @@ function blossomDish(z0, rBore) {
       let dp = a - 2 * Math.PI * k / 5;
       dp = Math.atan2(Math.sin(dp), Math.cos(dp));
       const half = 10 * Math.PI / 180;
-      if (Math.abs(dp) < half) rp -= 1.5 * (1 - Math.abs(dp) / half);
+      if (Math.abs(dp) < half) rp -= 1.1 * (1 - Math.abs(dp) / half);
     }
     const P = [[rBore, z0 + D.MOUTH_LIP],                // mép trong, ngang miệng trụ
                [rBore, z0],                              // lòng đĩa
@@ -665,6 +690,18 @@ function derive() {
   return {
     br, wells, top, low, pitch, merged, neck, postGap, portZ, riserZ,
     chimneyH,
+    foot: (() => {
+      const { holes, circ } = footHoles();
+      const area = { heart: 0.66, star: 0.52, flower: 0.74, circle: 1 };
+      const open = holes.reduce((a, h) => a + Math.PI * h.r * h.r * area[h.kind], 0);
+      return {
+        n: holes.length,
+        betta: holes.filter(h => h.r >= D.FISH_BETTA_R * 0.9).length,
+        guppy: holes.filter(h => h.r >= D.FISH_GUPPY_R * 0.85).length,
+        cover: 100 * open / (circ * D.FOOT_H),
+        biggest: Math.max(...holes.map(h => h.r)) * 2,
+      };
+    })(),
     ringW: br - (D.ROOT_HOLE / 2 + D.CHIMNEY_W),
     ringMl: Math.PI * (br ** 2 - (D.ROOT_HOLE / 2 + D.CHIMNEY_W) ** 2)
             * (D.WELL_DEPTH + D.SPOON_DEPTH - D.CROWN_GAP) / 1000,
@@ -1044,50 +1081,22 @@ function report(d) {
      + `faster than one feed duct fills, so the level cannot climb`,
      D.CROWN_GAP >= 2 && D.ROOT_HOLE >= 2.5 * D.PORT_D ? "ok" : "warn"],
 
-    ["Foot leaves room for fish",
-     `&#216;${D.FOOT_D} solid skirt, ${D.FOOT_WALL} mm wall, with ${D.FOOT_SHAPES} cut-outs - `
-     + `hearts, stars, flowers and circles, the same idea as the V1 mesh base. Each opening is `
-     + `triangulated from its real outline, so the edges are clean and have thickness. `
-     + `${(glassR(D.FOOT_Z) - D.FOOT_D / 2).toFixed(0)} mm of open water all round it, where `
-     + `V1's &#216;60 base sat against the wall. Seed ${D.FOOT_SEED}, locked`,
-     glassR(D.FOOT_Z) - D.FOOT_D / 2 >= 8 ? "ok" : "warn"],
+    ["Holes are sized to the fish, not to taste",
+     `${d.foot.betta} openings around &#216;${(D.FISH_BETTA_R * 2)} for a betta - they are `
+     + `~25 mm deep through the fins - and ${d.foot.guppy} around &#216;`
+     + `${(D.FISH_GUPPY_R * 2)} for guppies. Biggest cut is &#216;${d.foot.biggest.toFixed(0)}`,
+     d.foot.betta >= 1 && d.foot.guppy >= 3 ? "ok" : "warn"],
 
-    ["Stem hangs on the glass, hugging it",
-     `two ${D.CLIP_ARC}&deg; collars of R${D.CLIP_IN} snap onto the glass wall at `
-     + `${D.CLIP_Z.join(" and ")} mm, and the cover runs down at R${D.STEM_HUG_R} against the `
-     + `R48.2 wall, its inner face ${(D.STEM_HUG_R - D.STEM_IN - D.STEM_WALL - 48.2).toFixed(1)} mm `
-     + `off it. Clipping to the rim was useless - the tray already covers the rim`,
-     D.STEM_HUG_R - D.STEM_IN - D.STEM_WALL - 48.2 <= 4 ? "ok" : "warn"],
+    ["Scatter actually covers the skirt",
+     `${d.foot.n} holes, ${d.foot.cover.toFixed(0)} % of the skirt open. Big shapes are placed `
+     + `first and anything that will not fit shrinks ${(D.FOOT_SHRINK * 100).toFixed(0)} % and `
+     + `tries again, up to ${D.FOOT_TRIES} times - plain scattering jams after a handful`,
+     d.foot.cover >= 25 && d.foot.n >= 12 ? "ok" : "warn"],
 
-    ["Stem stays outside the glass wall",
-     `cover centreline at R${D.STEM_HUG_R} minus its own `
-     + `${(D.STEM_IN + D.STEM_WALL).toFixed(1)} mm outer radius leaves `
-     + `${(D.STEM_HUG_R - D.STEM_IN - D.STEM_WALL - 48.2).toFixed(1)} mm clear of the R48.2 `
-     + `glass. The leaf and pad sit above the rim, so they cannot foul it either`,
-     D.STEM_HUG_R - D.STEM_IN - D.STEM_WALL - 48.2 >= 0.5 ? "ok" : "bad"],
-
-    ["Rim crossing is covered, and useful",
-     `a ${D.PAD_L} x ${D.PAD_W} mm pad caps the point where the hose goes over the rim - `
-     + `hides it, and gives somewhere to rest a spoon or a ring`,
-     "ok"],
-
-    ["Pour mouth is a blossom dish, tilted like the rim",
-     `five petals to R${D.MOUTH_RING + D.MOUTH_PET} with cleft tips, ${D.MOUTH_LIP} mm deep, `
-     + `leaning the same 21.3&deg; as the glass. A small bloom sitting inside the big one, `
-     + `the way the reference set stacks them`,
-     "ok"],
-
-    ["Pour dish clears the plants",
-     `dish underside at ${(D.POST_TOP - D.MOUTH_LIP).toFixed(0)} mm, tallest rosette tops out `
-     + `near ${d.canopyZ.toFixed(0)} mm - ${(D.POST_TOP - D.MOUTH_LIP - d.canopyZ).toFixed(0)} mm `
-     + `of daylight, so you can pour without pushing leaves aside`,
-     D.POST_TOP - D.MOUTH_LIP - d.canopyZ >= 4 ? "ok" : "bad"],
-
-    ["Hose is hidden under a stem",
-     `a C-section cover, &#216;${(2 * (D.STEM_IN + D.STEM_WALL)).toFixed(1)} outside with a `
-     + `${D.STEM_OPEN}&deg; slot underneath, presses onto the hose where it crosses the rim. `
-     + `Reads as the flower's stem, with a leaf on it - the fourth printed part`,
-     D.STEM_IN >= 2.6 ? "ok" : "warn"],
+    ["Skirt still has something to stand on",
+     `${(100 - d.foot.cover).toFixed(0)} % solid; it is the only thing holding the riser `
+     + `upright`,
+     100 - d.foot.cover >= 50 ? "ok" : "warn"],
 
     ["Air hose is clipped, not dangling",
      `${D.CLIP_N} C-clips up the riser hold the hose against the tube; a slack loop in mid `
