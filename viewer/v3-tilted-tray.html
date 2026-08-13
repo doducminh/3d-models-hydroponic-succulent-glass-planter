@@ -213,7 +213,7 @@ const D = {
   POST_OD: 18, POST_ID: 14,
   RISER_OD: 11, RISER_ID: 7,
   PORT_D: 4, DUCT_WALL: 1.6,
-  POST_TOP: 118,
+  POST_TOP: 140,        // ⚠️ phải cao hơn tán sen đá, xem phép kiểm
   FOOT_Z: 4, FUNNEL_H: 12, FUNNEL_D: 26,
   BARB_D: 5, BARB_LEN: 9, BARB_Z: 16,
   SUBMERGE_MIN: 0.70,
@@ -515,7 +515,8 @@ function blossomDish(z0, rBore) {
                [rp, z0 + D.MOUTH_LIP - 2.2],
                [rBore + 1.6, z0 - 2.2],
                [rBore, z0 + D.MOUTH_LIP]];
-    rows.push(P.map(([r, z]) => [r * c, r * s, z]));
+    // nghiêng đúng góc vành ly: mỗi điểm dâng theo bán kính của chính nó
+    rows.push(P.map(([r, z]) => [r * c, r * s, z + r * c * t]));
   }
   return strip(rows, C.post);
 }
@@ -567,7 +568,9 @@ function stemCover(hoseCurve) {
   const grp = new THREE.Group();
   // Lấy điểm THẲNG TỪ đường dây khí — vẽ một đường cong riêng thì cuống chạy
   // song song bên cạnh dây chứ không ôm lấy nó.
-  const t0 = 0.52, t1 = 0.88, pts = [];
+  // t1 dừng TRƯỚC điểm dây bẻ ra ngoài (t≈0.82) nên đuôi cuống vẫn thẳng và
+  // áp sát thành ly, không cong hắt ra như bản trước.
+  const t0 = 0.52, t1 = 0.78, pts = [];
   for (let i = 0; i <= 8; i++) pts.push(hoseCurve.getPoint(t0 + (t1 - t0) * i / 8));
   const curve = new THREE.CatmullRomCurve3(pts);
   grp.add(new THREE.Mesh(sweepC(curve, D.STEM_IN, D.STEM_WALL, D.STEM_OPEN), mat(C.tray)));
@@ -656,6 +659,9 @@ function derive() {
   return {
     br, wells, top, low, pitch, merged, neck, postGap, portZ, riserZ,
     chimneyH,
+    // đỉnh tán cây cao nhất: hoa thị đặt ở local z = -SEAT_DROP+10, cao thêm 10
+    canopyZ: Math.max(...wells.map(w => w.topZ)) + (10 + 10 - D.SEAT_DROP)
+             * Math.cos(G.TILT * Math.PI / 180),
     lift: riserZ - S.water, tubeLen, submergeRatio: submerged / tubeLen,
     maxAirZ: D.FOOT_Z + (S.water - D.FOOT_Z) / D.SUBMERGE_MIN,
     airReach: wells.filter(w => w.inletZ <= D.FOOT_Z + (S.water - D.FOOT_Z) / D.SUBMERGE_MIN).length,
@@ -1020,11 +1026,17 @@ function report(d) {
      + `hides it, and gives somewhere to rest a spoon or a ring`,
      "ok"],
 
-    ["Pour mouth is a blossom dish",
+    ["Pour mouth is a blossom dish, tilted like the rim",
      `five petals to R${D.MOUTH_RING + D.MOUTH_PET} with cleft tips, ${D.MOUTH_LIP} mm deep, `
-     + `instead of a plain funnel - the flower repeats at the centre, the way the reference `
-     + `set stacks a small bloom inside a big one`,
+     + `leaning the same 21.3&deg; as the glass. A small bloom sitting inside the big one, `
+     + `the way the reference set stacks them`,
      "ok"],
+
+    ["Pour dish clears the plants",
+     `dish underside at ${(D.POST_TOP - D.MOUTH_LIP).toFixed(0)} mm, tallest rosette tops out `
+     + `near ${d.canopyZ.toFixed(0)} mm - ${(D.POST_TOP - D.MOUTH_LIP - d.canopyZ).toFixed(0)} mm `
+     + `of daylight, so you can pour without pushing leaves aside`,
+     D.POST_TOP - D.MOUTH_LIP - d.canopyZ >= 4 ? "ok" : "bad"],
 
     ["Hose is hidden under a stem",
      `a C-section cover, &#216;${(2 * (D.STEM_IN + D.STEM_WALL)).toFixed(1)} outside with a `
