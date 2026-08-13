@@ -94,6 +94,7 @@
       <label>Show</label>
       <button id="b-glass" aria-pressed="true">glass + water</button>
       <button id="b-plants" aria-pressed="true">plants</button>
+      <button id="b-stem" aria-pressed="true">stem cover</button>
     </div>
     <div class="row">
       <label>Camera</label>
@@ -185,6 +186,13 @@ const D = {
   FOOT_SEED: 7,         // ⚠️ khoá cứng — đổi số là ra bố cục lỗ khác hẳn
   FOOT_SHAPES: 11,      // số lỗ hình trên váy đế — ít mà to, cá chui lọt
 
+  // ── CUỐNG HOA: nắp che dây khí chỗ nó vắt qua khấc trên mâm.
+  //    Chi tiết RỜI thứ tư, tiết diện chữ C úp xuống, bấm lên dây.
+  STEM_IN: 3.4,         // lòng chữ C, ôm dây Ø4.4 thoải mái
+  STEM_WALL: 1.5,
+  STEM_OPEN: 104,       // bề rộng khe hở phía dưới, tính bằng độ
+  LEAF_L: 17, LEAF_W: 10,
+
   // ── GỜ MÓC DÂY trên ống nâng, giữ dây khí khỏi lơ lửng
   CLIP_N: 3, CLIP_R: 3.4,
 
@@ -216,7 +224,7 @@ const D = {
   FIT_SLIDE: 0.30,      // P.clearance("sliding")— ống nâng rút ra rửa
 };
 
-const S = { bore: 28, water: 74, glass: true, plants: true, view: "whole", explode: false };
+const S = { bore: 28, water: 74, glass: true, plants: true, view: "whole", explode: false, stem: true };
 
 const stage = document.getElementById("stage");
 const errEl = document.getElementById("err");
@@ -471,6 +479,72 @@ function footSkirt() {
   return new THREE.Mesh(g, mat(C.tube));
 }
 
+// ════════════════════════ CUỐNG HOA che dây khí
+// Quét một tiết diện chữ C dọc đường cong: vòng ngoài rồi vòng trong ngược chiều
+// -> ống có thành thật, hở một khe dưới bụng để bấm lên dây.
+function sweepC(curve, rIn, wall, openDeg, N = 44) {
+  const half = openDeg * Math.PI / 360, M = 26;
+  const prof = [];
+  for (let i = 0; i <= M; i++) {                       // cung ngoài
+    const a = half + (2 * Math.PI - 2 * half) * i / M;
+    prof.push([(rIn + wall) * Math.cos(a), (rIn + wall) * Math.sin(a)]);
+  }
+  for (let i = M; i >= 0; i--) {                       // cung trong, ngược lại
+    const a = half + (2 * Math.PI - 2 * half) * i / M;
+    prof.push([rIn * Math.cos(a), rIn * Math.sin(a)]);
+  }
+  const K = prof.length, fr = curve.computeFrenetFrames(N, false);
+  const pos = [], idx = [];
+  for (let i = 0; i <= N; i++) {
+    const pt = curve.getPoint(i / N), n = fr.normals[i], b = fr.binormals[i];
+    prof.forEach(q => pos.push(pt.x + n.x * q[0] + b.x * q[1],
+                               pt.y + n.y * q[0] + b.y * q[1],
+                               pt.z + n.z * q[0] + b.z * q[1]));
+  }
+  for (let i = 0; i < N; i++)
+    for (let j = 0; j < K; j++) {
+      const a = i * K + j, c = a + K, d = (j + 1) % K;
+      const b2 = i * K + d, e = b2 + K;
+      idx.push(a, c, e, a, e, b2);
+    }
+  for (const i of [0, N]) {                            // bịt hai đầu
+    const o = i * K;
+    for (let j = 1; j < M; j++)
+      idx.push(o + j, o + j + 1, o + K - 1 - j, o + j + 1, o + K - 2 - j, o + K - 1 - j);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+
+function stemCover(hoseCurve) {
+  const grp = new THREE.Group();
+  // Lấy điểm THẲNG TỪ đường dây khí — vẽ một đường cong riêng thì cuống chạy
+  // song song bên cạnh dây chứ không ôm lấy nó.
+  const t0 = 0.50, t1 = 0.88, pts = [];
+  for (let i = 0; i <= 8; i++) pts.push(hoseCurve.getPoint(t0 + (t1 - t0) * i / 8));
+  const curve = new THREE.CatmullRomCurve3(pts);
+  grp.add(new THREE.Mesh(sweepC(curve, D.STEM_IN, D.STEM_WALL, D.STEM_OPEN), mat(C.tray)));
+
+  // một chiếc lá cho ra dáng cuống hoa
+  const leafPts = [];
+  for (let i = 0; i < 40; i++) {
+    const u = i / 40 * Math.PI * 2, x = Math.cos(u);
+    leafPts.push(new THREE.Vector2(D.LEAF_L / 2 * x,
+                                   D.LEAF_W / 2 * Math.sin(u) * (0.55 + 0.45 * (1 - x) / 2)));
+  }
+  const leaf = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape(leafPts),
+    { depth: 1.6, bevelEnabled: false, curveSegments: 16, steps: 1 }), mat(C.tray));
+  const at = curve.getPoint(0.62), tg = curve.getTangent(0.62);
+  leaf.position.copy(at);
+  leaf.lookAt(at.clone().add(new THREE.Vector3(0, 0, 1)));
+  leaf.rotateZ(Math.atan2(tg.y, tg.x) + 0.5);
+  leaf.translateX(D.LEAF_L / 2 + 1);
+  grp.add(leaf);
+  return grp;
+}
+
 // ════════════════════════ suy ra
 // Mọi thứ dựng trong HỆ TOẠ ĐỘ CỦA MÂM (mâm = mặt phẳng xy), rồi xoay cả cụm
 // đi 21.3°. Nhờ vậy hốc và muỗng chỉ là lathe thường, không phải bẻ từng cái.
@@ -710,7 +784,7 @@ function rebuild() {
   // Phía thấp là mặt người xem nhìn vào — không để máy móc ở đó.
   const highRimZ = G.RIM_MID + G.MOUTH_R * t;
   const trayHighZ = D.TRAY_Z0 + (D.TRAY_DIA / 2) * t;
-  model.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+  const hoseCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(D.RISER_OD / 2 + D.BARB_LEN, 0, D.BARB_Z),
     new THREE.Vector3(D.RISER_OD / 2 + 4, 0, D.BARB_Z + 12),   // cài vào gờ móc
     new THREE.Vector3(D.RISER_OD / 2 + 4, 0, D.BARB_Z + 44),
@@ -719,7 +793,10 @@ function rebuild() {
     new THREE.Vector3(48, 0, trayHighZ + 3),               // qua khấc trên mâm
     new THREE.Vector3(60, -3, trayHighZ - 14),
     new THREE.Vector3(78, -8, 40), new THREE.Vector3(92, -12, 11),
-  ]), 70, 2.2, 10, false), mat(C.hose)));
+  ]);
+  model.add(new THREE.Mesh(new THREE.TubeGeometry(hoseCurve, 70, 2.2, 10, false), mat(C.hose)));
+  if (S.stem) model.add(stemCover(hoseCurve));
+
   const pump = new THREE.Mesh(new THREE.BoxGeometry(28, 22, 20), mat(C.pump));
   pump.position.set(112, -12, 10);
   model.add(pump);
@@ -849,6 +926,12 @@ function report(d) {
      + `V1's &#216;60 base sat against the wall. Seed ${D.FOOT_SEED}, locked`,
      glassR(D.FOOT_Z) - D.FOOT_D / 2 >= 12 ? "ok" : "warn"],
 
+    ["Hose is hidden under a stem",
+     `a C-section cover, &#216;${(2 * (D.STEM_IN + D.STEM_WALL)).toFixed(1)} outside with a `
+     + `${D.STEM_OPEN}&deg; slot underneath, presses onto the hose where it crosses the rim. `
+     + `Reads as the flower's stem, with a leaf on it - the fourth printed part`,
+     D.STEM_IN >= 2.6 ? "ok" : "warn"],
+
     ["Air hose is clipped, not dangling",
      `${D.CLIP_N} C-clips up the riser hold the hose against the tube; a slack loop in mid `
      + `water snags and looks like a mess`,
@@ -939,6 +1022,7 @@ function toggle(id, key, on, off) {
 }
 toggle("b-glass",  "glass",  "glass + water", "glass hidden");
 toggle("b-plants", "plants", "plants", "plants hidden");
+toggle("b-stem",   "stem",   "stem cover", "stem hidden");
 
 const cam = { theta: -Math.PI / 2.4, phi: 1.22, dist: 350,
               target: new THREE.Vector3(0, 0, 72) };
