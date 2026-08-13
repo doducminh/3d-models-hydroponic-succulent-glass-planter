@@ -180,9 +180,9 @@ const D = {
 
   // ── CHÂN ĐẾ: kế thừa đế lưới V1 nhưng THU NHỎ, chừa chỗ cho cá bơi quanh
   FOOT_D: 48,           // V1 là Ø60 sát thành ly; giờ hẹp lại lấy chỗ bơi
-  FOOT_H: 24,
-  FOOT_RIBS: 9,         // số nan mỗi chiều; đan chéo thành lưới
-  FOOT_TWIST: 46,       // độ xoắn của nan, tính bằng độ
+  FOOT_H: 30,
+  FOOT_SEED: 7,         // ⚠️ khoá cứng — đổi số là ra bố cục lỗ khác hẳn
+  FOOT_SHAPES: 10,      // số lỗ hình trên váy đế — ít mà to, cá chui lọt
 
   // ── GỜ MÓC DÂY trên ống nâng, giữ dây khí khỏi lơ lửng
   CLIP_N: 3, CLIP_R: 3.4,
@@ -203,7 +203,9 @@ const D = {
   BED: 215,
 
   // ── DÁNG: mép mâm lượn cánh hoa, mỗi cánh ôm một hốc
-  PET_R: 19, PET_RING: 37, PET_CORE: 43,   // cánh hoa: bán kính, vòng đặt, lõi
+  PET_R: 20, PET_RING: 36, PET_CORE: 42,   // cánh hoa: bán kính, vòng đặt, lõi
+  PET_CLEFT_D: 9,       // ⚠️ độ sâu khía chẻ ở ĐẦU cánh — dấu nhận dạng hoa anh đào
+  PET_CLEFT_A: 13,      // nửa bề rộng khía, tính bằng độ
   GRIP_R: 9,            // khấc cầm hai bên để nhấc cả cụm ra
   GRIP_AT: 90,          // đặt ở hai bên sườn, không phải phía cao/thấp
 
@@ -290,6 +292,15 @@ function petalPts(rBase, seg = 320) {
       if (Math.abs(s) <= D.PET_R)
         r = Math.max(r, D.PET_RING * Math.cos(dp) + Math.sqrt(D.PET_R * D.PET_R - s * s));
     }
+    // Khía chẻ ở đầu mỗi cánh. Không có nó thì chỉ là hoa tròn chung chung;
+    // có nó mới ra hoa anh đào.
+    for (let k = 0; k < D.N; k++) {
+      let dp = a - (D.PHASE + 2 * Math.PI * k / D.N);
+      dp = Math.atan2(Math.sin(dp), Math.cos(dp));
+      const half = D.PET_CLEFT_A * Math.PI / 180;
+      if (Math.abs(dp) < half)
+        r -= D.PET_CLEFT_D * (1 - Math.abs(dp) / half);
+    }
     // khấc luồn dây khí ở phía CAO (0°) — tức MẶT SAU, khuất khỏi hướng nhìn
     {
       const gx = rBase, gy = 0;
@@ -330,6 +341,80 @@ function trayEdgeR(th) {
   const a = (D.PET_RING + D.PET_R) * Math.cos(G.TILT * Math.PI / 180),
         b = D.PET_RING + D.PET_R;
   return a * b / Math.hypot(b * Math.cos(th), a * Math.sin(th));
+}
+
+// ════════════════════════ lỗ hình trên váy đế (kiểu đế lưới V1)
+// Bốn biên dạng viết bằng hàm bán kính theo góc — đủ để nhìn ra hình. Bản in
+// thật dùng lib/shapes.py, ở đó còn có bó hoa và capybara.
+function shapeR(kind, ang, r) {
+  const a = ((ang % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  if (kind === "circle") return r;
+  if (kind === "flower") return r * (0.64 + 0.36 * Math.cos(6 * a));
+  if (kind === "star") {
+    const seg = Math.PI / 5, k = Math.floor(a / seg), f = (a - k * seg) / seg;
+    const r0 = k % 2 === 0 ? r : r * 0.47, r1 = k % 2 === 0 ? r * 0.47 : r;
+    return r0 + (r1 - r0) * f;
+  }
+  // tim: bán kính theo góc, đỉnh nhọn quay XUỐNG để in không phải bắc cầu
+  const s = Math.sin(a), c = Math.cos(a);
+  return r * 0.62 * (2 - 2 * s + s * Math.sqrt(Math.abs(c)) / (s + 1.4));
+}
+function inShape(kind, dx, dy, r) {
+  const d = Math.hypot(dx, dy);
+  return d <= shapeR(kind, Math.atan2(dy, dx), r);
+}
+// gieo ngẫu nhiên có khoá hạt, thả lỗ lớn trước — đúng cách V1 làm
+function footHoles() {
+  let s = D.FOOT_SEED >>> 0;
+  const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const kinds = ["heart", "star", "flower", "circle"];
+  const rB = D.FOOT_D / 2, rT = D.RISER_OD / 2 + 4;
+  const circ = 2 * Math.PI * (rB + rT) / 2;
+  const out = [];
+  const sizes = [];
+  for (let i = 0; i < D.FOOT_SHAPES; i++) sizes.push(9.0 - 4.2 * i / D.FOOT_SHAPES);
+  for (const rad of sizes) {
+    for (let tries = 0; tries < 400; tries++) {
+      const u = 0.20 + rnd() * 0.58;                 // chừa vành trên và vành dưới
+      const sPos = rnd() * circ;
+      const ok = out.every(o => {
+        let ds = Math.abs(o.s - sPos); ds = Math.min(ds, circ - ds);
+        return Math.hypot(ds, (o.u - u) * D.FOOT_H) >= o.r + rad + 3.2;
+      });
+      if (ok) { out.push({ s: sPos, u, r: rad, kind: kinds[out.length % 4] }); break; }
+    }
+  }
+  return { holes: out, circ, rB, rT };
+}
+function footSkirt() {
+  const { holes, circ, rB, rT } = footHoles();
+  const NA = 200, NH = 34, pos = [], idx = [];
+  const P3 = (a, u) => {
+    const r = rB + (rT - rB) * u;
+    return [r * Math.cos(a), r * Math.sin(a), D.FOOT_Z + D.FOOT_H * u];
+  };
+  let n = 0;
+  for (let i = 0; i < NA; i++)
+    for (let j = 0; j < NH; j++) {
+      const a0 = 2 * Math.PI * i / NA, a1 = 2 * Math.PI * (i + 1) / NA;
+      const u0 = j / NH, u1 = (j + 1) / NH;
+      const sM = (a0 + a1) / 2 / (2 * Math.PI) * circ, uM = (u0 + u1) / 2;
+      let cut = false;
+      for (const h of holes) {
+        let ds = sM - h.s;
+        if (ds > circ / 2) ds -= circ; else if (ds < -circ / 2) ds += circ;
+        if (inShape(h.kind, ds, (uM - h.u) * D.FOOT_H, h.r)) { cut = true; break; }
+      }
+      if (cut) continue;
+      const q = [P3(a0, u0), P3(a1, u0), P3(a1, u1), P3(a0, u1)];
+      q.forEach(v => pos.push(v[0], v[1], v[2]));
+      idx.push(n, n + 1, n + 2, n, n + 2, n + 3);
+      n += 4;
+    }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return new THREE.Mesh(g, mat(C.tube));
 }
 
 // ════════════════════════ suy ra
@@ -532,22 +617,10 @@ function rebuild() {
   riserG.position.z = S.explode ? 108 : 0;
   // Chân đế côn có CỬA CHO CÁ: dựng thành từng nan, chừa khoảng hở giữa các nan.
   // Kế thừa dáng đế lưới V1 nhưng Ø48 thay vì Ø60 — cá có chỗ bơi quanh.
-  // Đế LƯỚI đan chéo hai chiều — đúng dáng đế lưới V1, ô hở lớn cho cá bơi qua.
-  // Sáu nan thẳng của bản trước trông như cái lồng, không phải cái đế.
-  const rB = D.FOOT_D / 2, rT = D.RISER_OD / 2 + 4;
-  for (const dir of [1, -1])
-    for (let k = 0; k < D.FOOT_RIBS; k++) {
-      const a0 = 2 * Math.PI * k / D.FOOT_RIBS, pts = [];
-      for (let i = 0; i <= 14; i++) {
-        const u = i / 14, a = a0 + dir * D.FOOT_TWIST * u * Math.PI / 180;
-        const r = rB + (rT - rB) * u;
-        pts.push(new THREE.Vector3(r * Math.cos(a), r * Math.sin(a),
-                                   D.FOOT_Z + D.FOOT_H * u));
-      }
-      riserG.add(new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 1.4, 8, false),
-        mat(C.tube)));
-    }
+  // Đế KHỐI ĐẶC khoét LỖ HÌNH — đúng kiểu đế lưới V1: váy côn liền, trên đó rải
+  // tim / sao / hoa / tròn. Bản đan chéo trước trông như cái lồng, không dễ thương.
+  // Bản in thật sẽ lấy đủ bộ biên dạng từ lib/shapes.py (có cả capybara).
+  riserG.add(footSkirt());
   // vành chân và vành cổ, nối các nan lại
   riserG.add(lathe([[D.FOOT_D / 2 - 3, D.FOOT_Z], [D.FOOT_D / 2, D.FOOT_Z],
                     [D.FOOT_D / 2, D.FOOT_Z + 3], [D.FOOT_D / 2 - 3, D.FOOT_Z + 3],
@@ -714,10 +787,10 @@ function report(d) {
      D.CROWN_GAP >= 2 && D.ROOT_HOLE >= 2.5 * D.PORT_D ? "ok" : "warn"],
 
     ["Foot leaves room for fish",
-     `&#216;${D.FOOT_D} lattice foot inside a &#216;${(2 * glassR(D.FOOT_Z)).toFixed(0)} glass `
-     + `floor - ${(glassR(D.FOOT_Z) - D.FOOT_D / 2).toFixed(0)} mm of open water all round, `
-     + `and ${D.FOOT_RIBS} ribs crossing each way so the skirt is mostly hole. V1's base was `
-     + `&#216;60 and sat against the wall`,
+     `&#216;${D.FOOT_D} solid skirt with ${D.FOOT_SHAPES} cut-outs - hearts, stars, flowers `
+     + `and circles, the same idea as the V1 mesh base. `
+     + `${(glassR(D.FOOT_Z) - D.FOOT_D / 2).toFixed(0)} mm of open water all round it, where `
+     + `V1's &#216;60 base sat against the wall. Seed ${D.FOOT_SEED}, locked`,
      glassR(D.FOOT_Z) - D.FOOT_D / 2 >= 12 ? "ok" : "warn"],
 
     ["Air hose is clipped, not dangling",
@@ -774,9 +847,11 @@ function report(d) {
      "ok"],
 
     ["Shape reads as a flower, not a fixture",
-     `${D.N} round petals, each the union of a &#216;${2 * D.PET_R} circle with the core - a `
-     + `real blossom outline, not a wavy edge. Petal tips reach `
-     + `${(D.PET_RING + D.PET_R)} mm, notches come back to ${D.PET_CORE} mm`,
+     `${D.N} cherry-blossom petals: each is a &#216;${2 * D.PET_R} circle merged into the `
+     + `core, then a ${D.PET_CLEFT_D} mm cleft cut into its tip - that cleft is what makes it `
+     + `read as sakura rather than a generic flower. Tips `
+     + `${(D.PET_RING + D.PET_R - D.PET_CLEFT_D)}-${(D.PET_RING + D.PET_R)} mm, valleys `
+     + `${D.PET_CORE} mm`,
      "ok"],
 
     ["Fits the bed, plastic is sane",
