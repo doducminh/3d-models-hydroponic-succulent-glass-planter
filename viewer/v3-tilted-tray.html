@@ -158,7 +158,7 @@ const glassR = z => {
 // ════════════════════════ THIẾT KẾ — chốt cứng theo ly trên
 const D = {
   N: 5,                 // năm cây
-  TRAY_DIA: 104,        // gác lên vành ly Ø90, bám 11mm mỗi bên
+  TRAY_DIA: 112,        // = 2 x (PET_RING + PET_R)        // gác lên vành ly Ø90, bám 11mm mỗi bên
   TRAY_Z0: 98.5,        // = tâm vành + 1
   RING_R: 28,
   WALL: 3,
@@ -168,7 +168,7 @@ const D = {
   SEAT_DROP: 4,         // bầu rễ ngồi ở đây, tính từ mặt mâm
   WELL_DEPTH: 2,        // từ chỗ ngồi xuống miệng muỗng
   SPOON_DEPTH: 5,       // ⚠️ lòng muỗng NÔNG — chỉ đọng chút nước
-  SEAT_BORE: 24,        // lỗ dưới chỗ ngồi; bầu rễ Ø30 tì lên vành này
+  SEAT_BORE: 22,        // lỗ dưới chỗ ngồi; bầu rễ Ø30 tì lên vành này
 
   // ── ỐNG RỄ: lỗ giữa đáy muỗng, thông thẳng xuống ly.
   //    Vành ống cao hơn sàn muỗng nên vẫn đọng lại chút nước; rễ muốn thêm
@@ -176,13 +176,13 @@ const D = {
   // ⚠️ Chiều cao vành ống rễ KHÔNG đặt tay — suy ra từ khe an toàn dưới đây.
   //    Vành cao bao nhiêu thì mặt nước dâng lên bấy nhiêu; dâng quá là chạm lá.
   CROWN_GAP: 3,         // ⚠️ mặt nước phải thấp hơn đáy bầu rễ ít nhất bấy nhiêu
-  ROOT_HOLE: 10,        // đủ rộng cho chùm rễ đi qua
+  ROOT_HOLE: 20,        // ⚠️ = bề rộng bầu rễ, để cả chùm chui xuống ly được
 
   // ── CHÂN ĐẾ: kế thừa đế lưới V1 nhưng THU NHỎ, chừa chỗ cho cá bơi quanh
   FOOT_D: 48,           // V1 là Ø60 sát thành ly; giờ hẹp lại lấy chỗ bơi
   FOOT_H: 24,
-  FOOT_BAYS: 6,         // số cửa cho cá chui qua
-  FOOT_STRUT: 26,       // bề rộng mỗi nan, tính bằng độ
+  FOOT_RIBS: 9,         // số nan mỗi chiều; đan chéo thành lưới
+  FOOT_TWIST: 46,       // độ xoắn của nan, tính bằng độ
 
   // ── GỜ MÓC DÂY trên ống nâng, giữ dây khí khỏi lơ lửng
   CLIP_N: 3, CLIP_R: 3.4,
@@ -199,11 +199,11 @@ const D = {
   FOOT_Z: 4, FUNNEL_H: 12, FUNNEL_D: 26,
   BARB_D: 5, BARB_LEN: 9, BARB_Z: 16,
   SUBMERGE_MIN: 0.70,
-  ROOT_MIN: 10, ROOT_MAX: 20,
+  ROOT_W: 20, ROOT_LEN: 30,   // ⚠️ ĐO THẬT: bầu rễ rộng 20, dài 30
   BED: 215,
 
   // ── DÁNG: mép mâm lượn cánh hoa, mỗi cánh ôm một hốc
-  PETAL_A: 4,           // biên độ lượn
+  PET_R: 19, PET_RING: 37, PET_CORE: 43,   // cánh hoa: bán kính, vòng đặt, lõi
   GRIP_R: 9,            // khấc cầm hai bên để nhấc cả cụm ra
   GRIP_AT: 90,          // đặt ở hai bên sườn, không phải phía cao/thấp
 
@@ -277,11 +277,19 @@ function shapeOf(outer, holes = []) {
 }
 // Mép mâm lượn sáu cánh, mỗi cánh trùm một hốc. Khấc cầm là hai vết khuyết
 // hai bên sườn — chỗ đút hai ngón để nhấc CẢ CỤM ra thay nước.
-function petalPts(rBase, seg = 260) {
+function petalPts(rBase, seg = 320) {
   const out = [], gripA = D.GRIP_AT * Math.PI / 180;
   for (let i = 0; i < seg; i++) {
     const a = 2 * Math.PI * i / seg;
-    let r = rBase + D.PETAL_A * Math.cos(D.N * (a - D.PHASE));
+    // Cánh hoa THẬT: hợp của N hình tròn đặt trên vòng, cộng đĩa lõi ở giữa.
+    // Kiểu cũ (rBase + A·cos) chỉ gợn sóng nông, không ra dáng bông hoa.
+    let r = D.PET_CORE;
+    for (let k = 0; k < D.N; k++) {
+      const dp = a - (D.PHASE + 2 * Math.PI * k / D.N);
+      const s = D.PET_RING * Math.sin(dp);
+      if (Math.abs(s) <= D.PET_R)
+        r = Math.max(r, D.PET_RING * Math.cos(dp) + Math.sqrt(D.PET_R * D.PET_R - s * s));
+    }
     // khấc luồn dây khí ở phía CAO (0°) — tức MẶT SAU, khuất khỏi hướng nhìn
     {
       const gx = rBase, gy = 0;
@@ -319,7 +327,8 @@ function basinR(th) {
   return r;
 }
 function trayEdgeR(th) {
-  const a = D.TRAY_DIA / 2 * Math.cos(G.TILT * Math.PI / 180), b = D.TRAY_DIA / 2;
+  const a = (D.PET_RING + D.PET_R) * Math.cos(G.TILT * Math.PI / 180),
+        b = D.PET_RING + D.PET_R;
   return a * b / Math.hypot(b * Math.cos(th), a * Math.sin(th));
 }
 
@@ -367,13 +376,13 @@ function derive() {
     airReach: wells.filter(w => w.inletZ <= D.FOOT_Z + (S.water - D.FOOT_Z) / D.SUBMERGE_MIN).length,
     riserAbovePort: riserZ - portZ,
     // rễ tính từ chỗ bầu rễ ngồi, nước bắt đầu ở miệng muỗng
-    rootShortDrop: D.ROOT_MIN, waterStartDrop: D.WELL_DEPTH,
+    rootShortDrop: D.ROOT_LEN, waterStartDrop: D.WELL_DEPTH,
     // rễ đi từ chỗ bầu ngồi xuống, xuyên qua lớp nước đọng rồi qua ống rễ
     waterBand: [D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH - chimneyH,
                 D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH],
-    shortRootInWater: Math.min(D.ROOT_MIN, D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH)
+    shortRootInWater: Math.min(D.ROOT_LEN, D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH)
                       - (D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH - chimneyH)
-                      + (D.ROOT_MIN - D.SEAT_DROP),
+                      + (D.ROOT_LEN - D.SEAT_DROP),
     lowFloorAboveRes: 0,
     planR: D.RING_R + br,
     glassClear: glassR(low.floorZ) - (D.RING_R + br),
@@ -423,7 +432,7 @@ function rebuild() {
   // mặt mâm: đĩa có 6 lỗ hốc + lỗ trụ
   const holes = d.wells.map(w => circlePts(d.br, true, 40, w.lx, w.ly));
   holes.push(circlePts(D.POST_OD / 2, true, 40));
-  const plate = new THREE.ExtrudeGeometry(shapeOf(petalPts(D.TRAY_DIA / 2 - D.PETAL_A), holes),
+  const plate = new THREE.ExtrudeGeometry(shapeOf(petalPts(0), holes),
     { depth: D.WALL, bevelEnabled: false, curveSegments: 28, steps: 1 });
   plate.translate(0, 0, -D.WALL);
   plate.computeVertexNormals();
@@ -523,18 +532,22 @@ function rebuild() {
   riserG.position.z = S.explode ? 108 : 0;
   // Chân đế côn có CỬA CHO CÁ: dựng thành từng nan, chừa khoảng hở giữa các nan.
   // Kế thừa dáng đế lưới V1 nhưng Ø48 thay vì Ø60 — cá có chỗ bơi quanh.
-  const bayStep = 2 * Math.PI / D.FOOT_BAYS, strut = D.FOOT_STRUT * Math.PI / 180;
-  for (let k = 0; k < D.FOOT_BAYS; k++) {
-    const a0 = k * bayStep, rows = [];
-    for (let i = 0; i <= 12; i++) {
-      const a = a0 + strut * i / 12, c = Math.cos(a), s = Math.sin(a);
-      const rB = D.FOOT_D / 2, rT = D.RISER_OD / 2 + 3;
-      rows.push([[rB * c, rB * s, D.FOOT_Z], [rB * c, rB * s, D.FOOT_Z + 3],
-                 [rT * c, rT * s, D.FOOT_Z + D.FOOT_H],
-                 [rT * c, rT * s, D.FOOT_Z + D.FOOT_H + 2]]);
+  // Đế LƯỚI đan chéo hai chiều — đúng dáng đế lưới V1, ô hở lớn cho cá bơi qua.
+  // Sáu nan thẳng của bản trước trông như cái lồng, không phải cái đế.
+  const rB = D.FOOT_D / 2, rT = D.RISER_OD / 2 + 4;
+  for (const dir of [1, -1])
+    for (let k = 0; k < D.FOOT_RIBS; k++) {
+      const a0 = 2 * Math.PI * k / D.FOOT_RIBS, pts = [];
+      for (let i = 0; i <= 14; i++) {
+        const u = i / 14, a = a0 + dir * D.FOOT_TWIST * u * Math.PI / 180;
+        const r = rB + (rT - rB) * u;
+        pts.push(new THREE.Vector3(r * Math.cos(a), r * Math.sin(a),
+                                   D.FOOT_Z + D.FOOT_H * u));
+      }
+      riserG.add(new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 1.4, 8, false),
+        mat(C.tube)));
     }
-    riserG.add(strip(rows, C.tube));
-  }
   // vành chân và vành cổ, nối các nan lại
   riserG.add(lathe([[D.FOOT_D / 2 - 3, D.FOOT_Z], [D.FOOT_D / 2, D.FOOT_Z],
                     [D.FOOT_D / 2, D.FOOT_Z + 3], [D.FOOT_D / 2 - 3, D.FOOT_Z + 3],
@@ -594,10 +607,10 @@ function rebuild() {
       ball.position.set(w.lx, w.ly, -D.SEAT_DROP);
       g.add(ball);
       for (let j = 0; j < 5; j++) {
-        const rt = lathe([[0, 0], [0.8, 0], [0.8, D.ROOT_MAX], [0, D.ROOT_MAX], [0, 0]],
+        const rt = lathe([[0, 0], [0.8, 0], [0.8, D.ROOT_LEN], [0, D.ROOT_LEN], [0, 0]],
                          C.ball, undefined, 8);
         rt.position.set(w.lx + Math.cos(j * 1.3) * 3, w.ly + Math.sin(j * 1.3) * 3,
-                        -D.SEAT_DROP - D.ROOT_MAX);
+                        -D.SEAT_DROP - D.ROOT_LEN);
         g.add(rt);
       }
       const ros = lathe([[0, 0], [d.br + 5, 5], [d.br + 1, 9], [0, 10], [0, 0]],
@@ -634,16 +647,22 @@ function report(d) {
      + `how deep the puddle gets - anything above it goes straight down the hole`,
      d.chimneyH >= 3 && d.chimneyH <= 8 ? "ok" : "warn"],
 
-    ["Roots can grow on down into the glass",
-     `&#216;${D.ROOT_HOLE} chimney through each spoon floor; a plant that wants more water `
-     + `sends roots through it into the reservoir instead of being stuck in the puddle`,
-     D.ROOT_HOLE >= 8 ? "ok" : "warn"],
+    ["Roots reach the reservoir on their own",
+     `${D.ROOT_LEN} mm of root from a seat ${D.SEAT_DROP} mm down reaches `
+     + `${(D.SEAT_DROP + D.ROOT_LEN).toFixed(0)} mm below the rim - past the spoon and out `
+     + `through the &#216;${D.ROOT_HOLE} chimney into the glass`,
+     D.SEAT_DROP + D.ROOT_LEN > D.SEAT_DROP + D.WELL_DEPTH + D.SPOON_DEPTH ? "ok" : "warn"],
+
+    ["Puddle still rings the chimney",
+     `${((S.bore - D.ROOT_HOLE) / 2).toFixed(1)} mm wide collar of standing water round the `
+     + `root mass, for when the reservoir drops`,
+     (S.bore - D.ROOT_HOLE) / 2 >= 3 ? "ok" : "warn"],
 
     ["Roots pass through the puddle on the way down",
      `ball sits ${D.SEAT_DROP} mm below the rim; the puddle sits `
-     + `${d.waterBand[0]}-${d.waterBand[1]} mm down, and even ${D.ROOT_MIN} mm roots reach `
-     + `${D.SEAT_DROP + D.ROOT_MIN} mm - straight through it`,
-     D.SEAT_DROP + D.ROOT_MIN > d.waterBand[0] ? "ok" : "bad"],
+     + `${d.waterBand[0]}-${d.waterBand[1]} mm down, and even ${D.ROOT_LEN} mm roots reach `
+     + `${D.SEAT_DROP + D.ROOT_LEN} mm - straight through it`,
+     D.SEAT_DROP + D.ROOT_LEN > d.waterBand[0] ? "ok" : "bad"],
 
     ["Leaves stay dry",
      `water arrives at the post ${D.RING_R} mm away and runs down into the spoons - nothing `
@@ -695,10 +714,10 @@ function report(d) {
      D.CROWN_GAP >= 2 && D.ROOT_HOLE >= 2.5 * D.PORT_D ? "ok" : "warn"],
 
     ["Foot leaves room for fish",
-     `&#216;${D.FOOT_D} foot inside a &#216;${(2 * glassR(D.FOOT_Z)).toFixed(0)} glass floor - `
-     + `${(glassR(D.FOOT_Z) - D.FOOT_D / 2).toFixed(0)} mm of swimming space all round, and `
-     + `${D.FOOT_BAYS} bays through the skirt to swim into. V1's base was &#216;60 and left `
-     + `almost none`,
+     `&#216;${D.FOOT_D} lattice foot inside a &#216;${(2 * glassR(D.FOOT_Z)).toFixed(0)} glass `
+     + `floor - ${(glassR(D.FOOT_Z) - D.FOOT_D / 2).toFixed(0)} mm of open water all round, `
+     + `and ${D.FOOT_RIBS} ribs crossing each way so the skirt is mostly hole. V1's base was `
+     + `&#216;60 and sat against the wall`,
      glassR(D.FOOT_Z) - D.FOOT_D / 2 >= 12 ? "ok" : "warn"],
 
     ["Air hose is clipped, not dangling",
@@ -755,8 +774,9 @@ function report(d) {
      "ok"],
 
     ["Shape reads as a flower, not a fixture",
-     `${D.N} scalloped petals on the rim, one over each well; the spoons repeat the same `
-     + `pattern below, and the pour funnel opens like a bud`,
+     `${D.N} round petals, each the union of a &#216;${2 * D.PET_R} circle with the core - a `
+     + `real blossom outline, not a wavy edge. Petal tips reach `
+     + `${(D.PET_RING + D.PET_R)} mm, notches come back to ${D.PET_CORE} mm`,
      "ok"],
 
     ["Fits the bed, plastic is sane",
